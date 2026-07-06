@@ -87,7 +87,7 @@ async function promptAmount(player, title, label, max, withDirection) {
 async function promptShape(player, title, sizeLabel, sizeMax, withHeight) {
     const form = new ModalFormData().title(title).slider(sizeLabel, 1, sizeMax, { valueStep: 1, defaultValue: 5 });
     if (withHeight) {
-        form.slider("Height", 1, 128, { valueStep: 1, defaultValue: 10 });
+        form.slider("Height (negative = down, 0 = feet)", -128, 128, { valueStep: 1, defaultValue: 10 });
     }
     form.textField("Block or pattern", "stone or 50stone,50cobblestone");
     form.toggle("Hollow", { defaultValue: false });
@@ -121,7 +121,7 @@ async function promptShape(player, title, sizeLabel, sizeMax, withHeight) {
 async function promptBrush(player, title, withHeight) {
     const form = new ModalFormData().title(title).slider("Radius", 1, 5, { valueStep: 1, defaultValue: 3 });
     if (withHeight) {
-        form.slider("Height", 1, 32, { valueStep: 1, defaultValue: 4 });
+        form.slider("Height (negative = down, 0 = feet)", -32, 32, { valueStep: 1, defaultValue: 4 });
     }
     form.textField("Block or pattern", "stone or 50stone,50cobblestone");
     form.textField("Tool item id (blank = held tool)", "iron_shovel");

@@ -63,10 +63,11 @@ function buildSphere(player, radius, blockText, hollow, includeAir, center) {
 }
 
 /**
- * Builds a vertical cylinder based at a point.
+ * Builds a vertical cylinder based at a point. Negative heights build
+ * downward from the base; 0 places the single base layer.
  * @param {Player} player The acting player.
  * @param {number} radius The cylinder radius.
- * @param {number} height The cylinder height.
+ * @param {number} height The cylinder height (sign sets the direction).
  * @param {string} blockText The block id or pattern to build with.
  * @param {boolean} hollow When true, only the wall is built.
  * @param {boolean} includeAir When true, air cells are filled too.
@@ -79,16 +80,18 @@ function buildCylinder(player, radius, height, blockText, hollow, includeAir, ba
         return busy;
     }
     const r = Math.max(1, Math.floor(radius));
-    const h = Math.max(1, Math.floor(height));
-    const checked = shapePattern(blockText, cylinderVolume(r, h));
+    const layers = Math.max(1, Math.abs(Math.floor(height)));
+    const checked = shapePattern(blockText, cylinderVolume(r, layers));
     if (!checked.ok) {
         return checked;
     }
     const c = base ?? blockUnder(player);
-    const bboxMin = { x: c.x - r, y: c.y, z: c.z - r };
-    const bboxMax = { x: c.x + r, y: c.y + h - 1, z: c.z + r };
+    const baseY = Math.floor(height) < 0 ? c.y - layers + 1 : c.y;
+    const origin = { x: c.x, y: baseY, z: c.z };
+    const bboxMin = { x: c.x - r, y: baseY, z: c.z - r };
+    const bboxMax = { x: c.x + r, y: baseY + layers - 1, z: c.z + r };
     const label = (hollow ? "Hollow Cylinder " : "Cylinder ") + "§b" + checked.pattern.label;
-    runShapeEdit(player, player.dimension, cylinderRuns(c, r, h, Boolean(hollow)), bboxMin, bboxMax, checked.pattern, Boolean(includeAir), label, null);
+    runShapeEdit(player, player.dimension, cylinderRuns(origin, r, layers, Boolean(hollow)), bboxMin, bboxMax, checked.pattern, Boolean(includeAir), label, null);
     return { ok: true, message: "§a" + label + "§a started..." };
 }
 

@@ -83,7 +83,7 @@ function bindBrush(player, shape, blockText, radius, height, hollow, includeAir,
         byItem = new Map();
         brushes.set(player.name, byItem);
     }
-    byItem.set(itemId, { shape, blockText, radius: r, height: Math.max(1, Math.floor(height)), hollow: Boolean(hollow), includeAir: Boolean(includeAir) });
+    byItem.set(itemId, { shape, blockText, radius: r, height: Math.floor(height), hollow: Boolean(hollow), includeAir: Boolean(includeAir) });
     const label = (shape === "cylinder" ? "Cylinder" : "Sphere") + " brush (radius " + r + ", §b" + pattern.label + "§a)";
     return { ok: true, message: "§a" + label + " bound to §f" + shortName(itemId) + "§a. Use the tool on a block." };
 }
