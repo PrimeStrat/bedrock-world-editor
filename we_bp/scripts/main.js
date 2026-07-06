@@ -4,6 +4,9 @@ import { clearWorldEditStructures } from "./operations/undo.js";
 import { setPos1, setPos2 } from "./session.js";
 import { WE_CONFIG } from "./config.js";
 
+const POS1_COOLDOWN_TICKS = 5;
+const lastPos1Ticks = new Map();
+
 /**
  * Returns whether a player is wielding the selection wand in creative mode.
  * @param {Player} player The interacting player.
@@ -28,6 +31,12 @@ world.beforeEvents.playerBreakBlock.subscribe(ev => {
     }
     ev.cancel = true;
     const player = ev.player;
+    const tick = system.currentTick;
+    const lastTick = lastPos1Ticks.get(player.name);
+    if (lastTick !== undefined && tick - lastTick < POS1_COOLDOWN_TICKS) {
+        return;
+    }
+    lastPos1Ticks.set(player.name, tick);
     const loc = ev.block.location;
     setPos1(player.name, loc);
     system.run(() => {
