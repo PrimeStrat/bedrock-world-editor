@@ -17,7 +17,7 @@
     },
     "modules": [
         {
-            "description": "World-edit scripting module.",
+            "description": "World-editor scripting module.",
             "type": "script",
             "uuid": "5382a29e-883c-4d59-b4ff-1dc7f2b9c505",
             "version": [
