@@ -56,7 +56,8 @@ function runBoxEdit(player, dimension, min, max, pattern, matchId, includeAir, l
  * @returns {Generator} The chunked fill generator.
  */
 function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outChanged, playerName) {
-    const blockFilter = blockFilterFor(matchId, includeAir);
+    const excludeId = pattern.entries.length === 1 ? pattern.entries[0].permutation.type.id : null;
+    const blockFilter = blockFilterFor(matchId, includeAir, excludeId);
     const single = pattern.entries.length === 1 && !matchId;
     const filtered = Boolean(matchId) || !includeAir;
     const sweep = fallingBlockSweeper(dimension, min, max);
@@ -94,14 +95,17 @@ function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outC
                     for (let z = areaMin.z; z <= areaMax.z; z++) {
                         for (let y = areaMin.y; y <= areaMax.y; y++) {
                             const loc = { x, y, z };
-                            let allowed = true;
-                            if (filtered) {
-                                const block = dimension.getBlock(loc);
-                                allowed = Boolean(block) && cellMatchesFilter(block.typeId, matchId, includeAir);
+                            const block = dimension.getBlock(loc);
+                            let allowed = Boolean(block);
+                            if (allowed && filtered) {
+                                allowed = cellMatchesFilter(block.typeId, matchId, includeAir);
                             }
                             if (allowed) {
-                                dimension.setBlockPermutation(loc, pickPatternPermutation(pattern));
-                                changed += 1;
+                                const placed = pickPatternPermutation(pattern);
+                                if (block.typeId !== placed.type.id) {
+                                    dimension.setBlockPermutation(loc, placed);
+                                    changed += 1;
+                                }
                             }
                             sinceYield += 1;
                             if (sinceYield >= CELLS_PER_YIELD) {

@@ -92,6 +92,9 @@ function* generateJob(dimension, min, max, evaluate, pattern, playerName, label,
                         }
                         const before = block.permutation;
                         const placed = pickPatternPermutation(pattern);
+                        if (block.typeId === placed.type.id) {
+                            continue;
+                        }
                         dimension.setBlockPermutation(loc, placed);
                         changes.push({ location: loc, before, after: placed });
                     }

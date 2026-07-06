@@ -33,20 +33,30 @@ function boxVolume(a, b) {
 }
 
 /**
- * Builds a fillBlocks block filter from one or more match ids and an air-skip
- * setting.
+ * Builds a fillBlocks block filter from one or more match ids, an air-skip
+ * setting, and an already-placed exclusion so cells holding the target block
+ * are not rewritten.
  * @param {string|string[]|null} matchId Only include these block ids, or null for any.
  * @param {boolean} includeAir When false, air is excluded.
+ * @param {string|null} excludeId The block id being placed, excluded from the fill.
  * @returns {object} The block filter.
  */
-function blockFilterFor(matchId, includeAir) {
-    if (matchId) {
-        return { includeTypes: Array.isArray(matchId) ? matchId : [matchId] };
-    }
+function blockFilterFor(matchId, includeAir, excludeId) {
+    const excludeTypes = [];
     if (!includeAir) {
-        return { excludeTypes: [AIR_ID] };
+        excludeTypes.push(AIR_ID);
     }
-    return {};
+    if (excludeId && !excludeTypes.includes(excludeId)) {
+        excludeTypes.push(excludeId);
+    }
+    if (matchId) {
+        const filter = { includeTypes: Array.isArray(matchId) ? matchId : [matchId] };
+        if (excludeTypes.length > 0) {
+            filter.excludeTypes = excludeTypes;
+        }
+        return filter;
+    }
+    return excludeTypes.length > 0 ? { excludeTypes } : {};
 }
 
 /**

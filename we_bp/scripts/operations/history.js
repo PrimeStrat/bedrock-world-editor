@@ -1,7 +1,7 @@
 import { world, system, Dimension, Player } from "@minecraft/server";
 import { setBusy } from "../session.js";
 import { WE_CONFIG } from "../config.js";
-import { tickAreaFor, releaseTickArea } from "./ticking.js";
+import { tickAreaFor, releaseTickArea, pickAreaSpan } from "./ticking.js";
 import { refillBoxJob } from "./box.js";
 import { refillShapeJob } from "./shape.js";
 import { runTrackedJob } from "./jobs.js";
@@ -60,22 +60,43 @@ function applyRedo(player, record) {
  */
 function* placeTilesJob(dimension, tiles, playerName, blocks) {
     debugStart(playerName, "Undo (" + tiles.length + " tiles)");
-    let placed = 0;
+    const span = pickAreaSpan();
+    const groups = new Map();
     for (const tile of tiles) {
         const structure = world.structureManager.get(tile.id);
         if (!structure) {
             continue;
         }
-        const min = { x: tile.x, y: tile.y, z: tile.z };
-        const max = { x: tile.x + structure.size.x - 1, y: tile.y, z: tile.z + structure.size.z - 1 };
-        const ok = yield* tickAreaFor(dimension, min, max, playerName);
+        const key = Math.floor(tile.x / span) + "," + Math.floor(tile.z / span);
+        let group = groups.get(key);
+        if (!group) {
+            group = [];
+            groups.set(key, group);
+        }
+        group.push({ tile, structure });
+    }
+    let placed = 0;
+    for (const group of groups.values()) {
+        const gMin = { x: Infinity, y: Infinity, z: Infinity };
+        const gMax = { x: -Infinity, y: -Infinity, z: -Infinity };
+        for (const member of group) {
+            gMin.x = Math.min(gMin.x, member.tile.x);
+            gMin.y = Math.min(gMin.y, member.tile.y);
+            gMin.z = Math.min(gMin.z, member.tile.z);
+            gMax.x = Math.max(gMax.x, member.tile.x + member.structure.size.x - 1);
+            gMax.y = Math.max(gMax.y, member.tile.y + member.structure.size.y - 1);
+            gMax.z = Math.max(gMax.z, member.tile.z + member.structure.size.z - 1);
+        }
+        const ok = yield* tickAreaFor(dimension, gMin, gMax, playerName);
         if (!ok) {
             continue;
         }
-        world.structureManager.place(tile.id, dimension, min, { includeEntities: false });
-        placed += 1;
-        debugProgress(playerName, placed);
-        yield;
+        for (const member of group) {
+            world.structureManager.place(member.tile.id, dimension, { x: member.tile.x, y: member.tile.y, z: member.tile.z }, { includeEntities: false });
+            placed += 1;
+            debugProgress(playerName, placed);
+            yield;
+        }
     }
     releaseTickArea(playerName);
     debugEnd(playerName);

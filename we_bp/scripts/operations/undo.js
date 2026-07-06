@@ -1,7 +1,7 @@
 import { world, system, StructureSaveMode, Dimension } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
-import { TILE, TILE_HEIGHT } from "./util.js";
-import { tickAreaFor } from "./ticking.js";
+import { TILE, TILE_HEIGHT, chunkFloor } from "./util.js";
+import { tickAreaFor, pickAreaSpan } from "./ticking.js";
 import { debugStatus } from "./debug.js";
 
 const boxUndoCounters = new Map();
@@ -38,9 +38,10 @@ function reserveBoxUndoSlot(playerName) {
 
 /**
  * Generator that snapshots a box into a grid of structures no larger than
- * 64x384x64 (the structure size limit), ticking each tile's chunks before the
- * snapshot and yielding between tiles to stay under the watchdog. Pushes the
- * created tile descriptors into the provided array.
+ * 64x384x64 (the structure size limit). Tiles are grouped into span-sized
+ * ticking-area batches (the same batching the fills use) so one area load
+ * covers many tiles instead of cycling an area per tile. Pushes the created
+ * tile descriptors into the provided array.
  * @param {Dimension} dimension The dimension to snapshot.
  * @param {Vec3} min The inclusive box min corner.
  * @param {Vec3} max The inclusive box max corner.
@@ -52,25 +53,31 @@ function reserveBoxUndoSlot(playerName) {
 function* snapshotBoxTiles(dimension, min, max, playerName, slot, tiles) {
     const ids = [];
     let index = 0;
-    const total = Math.ceil((max.x - min.x + 1) / TILE) * Math.ceil((max.z - min.z + 1) / TILE) * Math.ceil((max.y - min.y + 1) / TILE_HEIGHT);
-    for (let tx = min.x; tx <= max.x; tx += TILE) {
-        for (let tz = min.z; tz <= max.z; tz += TILE) {
-            const tileMaxX = Math.min(tx + TILE - 1, max.x);
-            const tileMaxZ = Math.min(tz + TILE - 1, max.z);
-            const ok = yield* tickAreaFor(dimension, { x: tx, y: min.y, z: tz }, { x: tileMaxX, y: max.y, z: tileMaxZ }, playerName);
-            for (let ty = min.y; ty <= max.y; ty += TILE_HEIGHT) {
-                const tileMaxY = Math.min(ty + TILE_HEIGHT - 1, max.y);
-                const id = "we:undo_" + playerName.toLowerCase() + "_" + slot + "_" + index;
-                index += 1;
-                if (!ok) {
-                    continue;
+    const span = pickAreaSpan();
+    for (let ax = chunkFloor(min.x); ax <= max.x; ax += span) {
+        for (let az = chunkFloor(min.z); az <= max.z; az += span) {
+            const areaMin = { x: Math.max(ax, min.x), y: min.y, z: Math.max(az, min.z) };
+            const areaMax = { x: Math.min(ax + span - 1, max.x), y: max.y, z: Math.min(az + span - 1, max.z) };
+            const ok = yield* tickAreaFor(dimension, areaMin, areaMax, playerName);
+            for (let tx = areaMin.x; tx <= areaMax.x; tx += TILE) {
+                for (let tz = areaMin.z; tz <= areaMax.z; tz += TILE) {
+                    const tileMaxX = Math.min(tx + TILE - 1, areaMax.x);
+                    const tileMaxZ = Math.min(tz + TILE - 1, areaMax.z);
+                    for (let ty = min.y; ty <= max.y; ty += TILE_HEIGHT) {
+                        const tileMaxY = Math.min(ty + TILE_HEIGHT - 1, max.y);
+                        const id = "we:undo_" + playerName.toLowerCase() + "_" + slot + "_" + index;
+                        index += 1;
+                        if (!ok) {
+                            continue;
+                        }
+                        world.structureManager.delete(id);
+                        world.structureManager.createFromWorld(id, dimension, { x: tx, y: ty, z: tz }, { x: tileMaxX, y: tileMaxY, z: tileMaxZ }, { saveMode: StructureSaveMode.World, includeEntities: false });
+                        tiles.push({ id, x: tx, y: ty, z: tz });
+                        ids.push(id);
+                        debugStatus(playerName, "§7Undo snapshot: §f" + index + "§7 tile(s)...");
+                        yield;
+                    }
                 }
-                world.structureManager.delete(id);
-                world.structureManager.createFromWorld(id, dimension, { x: tx, y: ty, z: tz }, { x: tileMaxX, y: tileMaxY, z: tileMaxZ }, { saveMode: StructureSaveMode.World, includeEntities: false });
-                tiles.push({ id, x: tx, y: ty, z: tz });
-                ids.push(id);
-                debugStatus(playerName, "§7Undo snapshot: §f" + index + "/" + total + "§7 tile(s)...");
-                yield;
             }
         }
     }
@@ -78,9 +85,9 @@ function* snapshotBoxTiles(dimension, min, max, playerName, slot, tiles) {
 }
 
 /**
- * Generator that snapshots only the tiles a shape's runs touch, each clamped
- * to the runs' Y extent within that tile, so a sparse shape snapshots far
- * less than its bounding box.
+ * Generator that snapshots only the tiles a shape's runs touch, batched into
+ * span-sized ticking areas, minimizing native calls: untouched tiles cost
+ * nothing and each touched tile is one full-height createFromWorld.
  * @param {Dimension} dimension The dimension to snapshot.
  * @param {{x: number, y: number, z: number, length: number}[]} runs The shape runs.
  * @param {Vec3} bboxMin The inclusive bounding box min corner.
@@ -91,7 +98,7 @@ function* snapshotBoxTiles(dimension, min, max, playerName, slot, tiles) {
  * @returns {Generator} The snapshot job generator.
  */
 function* snapshotRunTiles(dimension, runs, bboxMin, bboxMax, playerName, slot, tiles) {
-    const bounds = new Map();
+    const touched = new Set();
     for (const run of runs) {
         if (run.y < bboxMin.y || run.y > bboxMax.y || run.z < bboxMin.z || run.z > bboxMax.z) {
             continue;
@@ -104,37 +111,55 @@ function* snapshotRunTiles(dimension, runs, bboxMin, bboxMax, playerName, slot, 
         const tz = Math.floor((run.z - bboxMin.z) / TILE);
         const txEnd = Math.floor((endX - bboxMin.x) / TILE);
         for (let tx = Math.floor((startX - bboxMin.x) / TILE); tx <= txEnd; tx++) {
-            const key = tx + "," + tz;
-            const entry = bounds.get(key);
-            if (!entry) {
-                bounds.set(key, { tx, tz, minY: run.y, maxY: run.y });
-            } else {
-                entry.minY = Math.min(entry.minY, run.y);
-                entry.maxY = Math.max(entry.maxY, run.y);
-            }
+            touched.add(tx + "," + tz);
         }
+    }
+    const span = pickAreaSpan();
+    const groups = new Map();
+    for (const key of touched) {
+        const parts = key.split(",");
+        const entry = { tx: Number(parts[0]), tz: Number(parts[1]) };
+        const gkey = Math.floor((bboxMin.x + entry.tx * TILE) / span) + "," + Math.floor((bboxMin.z + entry.tz * TILE) / span);
+        let group = groups.get(gkey);
+        if (!group) {
+            group = [];
+            groups.set(gkey, group);
+        }
+        group.push(entry);
     }
     const ids = [];
     let index = 0;
-    for (const entry of bounds.values()) {
-        const minX = bboxMin.x + entry.tx * TILE;
-        const maxX = Math.min(minX + TILE - 1, bboxMax.x);
-        const minZ = bboxMin.z + entry.tz * TILE;
-        const maxZ = Math.min(minZ + TILE - 1, bboxMax.z);
-        const ok = yield* tickAreaFor(dimension, { x: minX, y: entry.minY, z: minZ }, { x: maxX, y: entry.maxY, z: maxZ }, playerName);
-        for (let ty = entry.minY; ty <= entry.maxY; ty += TILE_HEIGHT) {
-            const tileMaxY = Math.min(ty + TILE_HEIGHT - 1, entry.maxY);
-            const id = "we:undo_" + playerName.toLowerCase() + "_" + slot + "_" + index;
-            index += 1;
-            if (!ok) {
-                continue;
+    for (const group of groups.values()) {
+        const gMin = { x: Infinity, y: bboxMin.y, z: Infinity };
+        const gMax = { x: -Infinity, y: bboxMax.y, z: -Infinity };
+        for (const entry of group) {
+            const minX = bboxMin.x + entry.tx * TILE;
+            const minZ = bboxMin.z + entry.tz * TILE;
+            gMin.x = Math.min(gMin.x, minX);
+            gMin.z = Math.min(gMin.z, minZ);
+            gMax.x = Math.max(gMax.x, Math.min(minX + TILE - 1, bboxMax.x));
+            gMax.z = Math.max(gMax.z, Math.min(minZ + TILE - 1, bboxMax.z));
+        }
+        const ok = yield* tickAreaFor(dimension, gMin, gMax, playerName);
+        for (const entry of group) {
+            const minX = bboxMin.x + entry.tx * TILE;
+            const maxX = Math.min(minX + TILE - 1, bboxMax.x);
+            const minZ = bboxMin.z + entry.tz * TILE;
+            const maxZ = Math.min(minZ + TILE - 1, bboxMax.z);
+            for (let ty = bboxMin.y; ty <= bboxMax.y; ty += TILE_HEIGHT) {
+                const tileMaxY = Math.min(ty + TILE_HEIGHT - 1, bboxMax.y);
+                const id = "we:undo_" + playerName.toLowerCase() + "_" + slot + "_" + index;
+                index += 1;
+                if (!ok) {
+                    continue;
+                }
+                world.structureManager.delete(id);
+                world.structureManager.createFromWorld(id, dimension, { x: minX, y: ty, z: minZ }, { x: maxX, y: tileMaxY, z: maxZ }, { saveMode: StructureSaveMode.World, includeEntities: false });
+                tiles.push({ id, x: minX, y: ty, z: minZ });
+                ids.push(id);
+                debugStatus(playerName, "§7Undo snapshot: §f" + index + "/" + touched.size + "§7 tile(s)...");
+                yield;
             }
-            world.structureManager.delete(id);
-            world.structureManager.createFromWorld(id, dimension, { x: minX, y: ty, z: minZ }, { x: maxX, y: tileMaxY, z: maxZ }, { saveMode: StructureSaveMode.World, includeEntities: false });
-            tiles.push({ id, x: minX, y: ty, z: minZ });
-            ids.push(id);
-            debugStatus(playerName, "§7Undo snapshot: §f" + index + "/" + bounds.size + "§7 tile(s)...");
-            yield;
         }
     }
     boxUndoSlotTiles.get(playerName).set(slot, ids);

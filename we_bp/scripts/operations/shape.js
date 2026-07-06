@@ -61,7 +61,8 @@ function runShapeEdit(player, dimension, runs, bboxMin, bboxMax, pattern, includ
  * @returns {Generator} The chunked run fill generator.
  */
 function* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, nativeMatch, includeAir, outChanged, playerName) {
-    const blockFilter = blockFilterFor(matchId, includeAir);
+    const excludeId = pattern.entries.length === 1 ? pattern.entries[0].permutation.type.id : null;
+    const blockFilter = blockFilterFor(matchId, includeAir, excludeId);
     const single = pattern.entries.length === 1 && (!matchId || nativeMatch);
     const filtered = Boolean(matchId) || !includeAir;
     const sweep = fallingBlockSweeper(dimension, bboxMin, bboxMax);
@@ -92,14 +93,17 @@ function* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, n
                 } else {
                     for (let x = startX; x <= endX; x++) {
                         const loc = { x, y: run.y, z: run.z };
-                        let allowed = true;
-                        if (filtered) {
-                            const block = dimension.getBlock(loc);
-                            allowed = Boolean(block) && cellMatchesFilter(block.typeId, matchId, includeAir);
+                        const block = dimension.getBlock(loc);
+                        let allowed = Boolean(block);
+                        if (allowed && filtered) {
+                            allowed = cellMatchesFilter(block.typeId, matchId, includeAir);
                         }
                         if (allowed) {
-                            dimension.setBlockPermutation(loc, pickPatternPermutation(pattern));
-                            blocks += 1;
+                            const placed = pickPatternPermutation(pattern);
+                            if (block.typeId !== placed.type.id) {
+                                dimension.setBlockPermutation(loc, placed);
+                                blocks += 1;
+                            }
                         }
                         sinceYield += 1;
                         if (sinceYield >= RUNS_PER_YIELD) {
