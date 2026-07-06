@@ -3,7 +3,7 @@ import { getPlayer, notPlayer } from "./common.js";
 import { openMainMenu } from "../menu/main_menu.js";
 
 const menuCommand = {
-    definition: { name: "we:menu", description: "Open the World Edit menu.", permissionLevel: CommandPermissionLevel.Admin, cheatsRequired: false },
+    definition: { name: "we:menu", description: "Open the World Editor menu.", permissionLevel: CommandPermissionLevel.Admin, cheatsRequired: false },
     handler(origin) {
         const player = getPlayer(origin);
         if (!player) {

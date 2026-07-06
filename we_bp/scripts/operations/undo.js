@@ -141,7 +141,7 @@ function* snapshotRunTiles(dimension, runs, bboxMin, bboxMax, playerName, slot, 
 }
 
 /**
- * Deletes every world edit structure saved to the world and removes this pack's
+ * Deletes every World Editor structure saved to the world and removes this pack's
  * ticking areas, spread across ticks so a large backlog cannot hang the
  * watchdog on world load. Undo/clipboard structures are session-scoped, so any
  * that survive into a new world load are stale and safe to remove. Call once
