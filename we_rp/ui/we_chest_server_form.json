@@ -1,0 +1,322 @@
+{
+    "namespace": "we_ui",
+    "chest_label": {
+        "type": "label",
+        "text": "#title_text",
+        "color": [
+            0.4,
+            0.26,
+            0.18
+        ],
+        "layer": 2,
+        "anchor_from": "bottom_left",
+        "anchor_to": "bottom_left"
+    },
+    "grid_items": {
+        "type": "grid",
+        "size": [
+            "100%",
+            "default"
+        ],
+        "offset": [
+            0,
+            0
+        ],
+        "grid_dimensions": "$grid_size",
+        "grid_item_template": "we_ui.inventory_item_panel",
+        "collection_name": "form_buttons",
+        "layer": 1
+    },
+    "inventory_item_panel": {
+        "type": "panel",
+        "size": [
+            26,
+            26
+        ],
+        "layer": 1,
+        "controls": [
+            {
+                "bg@we_ui.cell": {}
+            },
+            {
+                "btn@we_ui.slot_button": {}
+            }
+        ]
+    },
+    "slot_button@common.button": {
+        "$pressed_button_name": "button.form_button_click",
+        "$default_control": "default",
+        "$hover_control": "hover",
+        "$pressed_control": "pressed",
+        "size": [
+            26,
+            26
+        ],
+        "bindings": [
+            {
+                "binding_name": "#form_button_text",
+                "binding_type": "collection",
+                "binding_collection_name": "form_buttons"
+            },
+            {
+                "binding_type": "view",
+                "source_property_name": "(not (#form_button_text = ''))",
+                "target_property_name": "#visible",
+                "binding_condition": "always"
+            }
+        ],
+        "controls": [
+            {
+                "default": {
+                    "type": "panel",
+                    "size": [
+                        26,
+                        26
+                    ],
+                    "controls": [
+                        {
+                            "icon@we_ui.slot_icon": {}
+                        }
+                    ]
+                }
+            },
+            {
+                "hover": {
+                    "type": "panel",
+                    "size": [
+                        26,
+                        26
+                    ],
+                    "controls": [
+                        {
+                            "icon@we_ui.slot_icon": {}
+                        },
+                        {
+                            "tooltip@we_ui.slot_tooltip": {}
+                        }
+                    ]
+                }
+            },
+            {
+                "pressed": {
+                    "type": "panel",
+                    "size": [
+                        26,
+                        26
+                    ],
+                    "controls": [
+                        {
+                            "icon@we_ui.slot_icon": {}
+                        },
+                        {
+                            "border@we_ui.focus_border": {}
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "slot_icon": {
+        "type": "image",
+        "size": [
+            20,
+            20
+        ],
+        "layer": 4,
+        "bindings": [
+            {
+                "binding_name": "#form_button_texture",
+                "binding_name_override": "#texture",
+                "binding_type": "collection",
+                "binding_collection_name": "form_buttons"
+            },
+            {
+                "binding_type": "view",
+                "source_property_name": "(not ((#texture = '') or (#texture = 'loading')))",
+                "target_property_name": "#visible",
+                "binding_condition": "always"
+            }
+        ],
+        "force_texture_reload": true
+    },
+    "slot_tooltip": {
+        "type": "custom",
+        "renderer": "hover_text_renderer",
+        "allow_clipping": false,
+        "layer": 30,
+        "bindings": [
+            {
+                "binding_name": "#form_button_text",
+                "binding_type": "collection",
+                "binding_collection_name": "form_buttons"
+            },
+            {
+                "binding_type": "view",
+                "source_property_name": "(#form_button_text - ('%.1s' * #form_button_text))",
+                "target_property_name": "#hover_text"
+            }
+        ]
+    },
+    "cell": {
+        "type": "image",
+        "texture": "textures/ui/cell_image",
+        "size": [
+            26,
+            26
+        ],
+        "layer": 2
+    },
+    "focus_border": {
+        "type": "image",
+        "size": [
+            26,
+            26
+        ],
+        "texture": "textures/ui/focus_border_white",
+        "layer": 4
+    },
+    "chest_ui_template": {
+        "type": "panel",
+        "size": [
+            "100%c",
+            "100%c"
+        ],
+        "bindings": [
+            {
+                "binding_name": "#title_text",
+                "binding_type": "global"
+            },
+            {
+                "binding_type": "view",
+                "source_property_name": "(not ((#title_text - $condition) = #title_text))",
+                "target_property_name": "#visible",
+                "binding_condition": "always"
+            }
+        ],
+        "controls": [
+            {
+                "background": {
+                    "type": "image",
+                    "texture": "textures/ui/dialog_background_opaque",
+                    "layer": 0,
+                    "size": [
+                        "100%c + 14px",
+                        "100%c + 11px"
+                    ],
+                    "controls": [
+                        {
+                            "container": {
+                                "type": "panel",
+                                "size": [
+                                    "100%c",
+                                    "100%c"
+                                ],
+                                "controls": [
+                                    {
+                                        "stack": {
+                                            "type": "stack_panel",
+                                            "orientation": "vertical",
+                                            "size": [
+                                                "198px",
+                                                "100%c"
+                                            ],
+                                            "controls": [
+                                                {
+                                                    "gap@common.empty_panel": {
+                                                        "size": [
+                                                            "100%",
+                                                            6
+                                                        ],
+                                                        "controls": [
+                                                            {
+                                                                "close_button@common.close_button": {
+                                                                    "$close_button_offset": [
+                                                                        5,
+                                                                        -3
+                                                                    ]
+                                                                }
+                                                            }
+                                                        ]
+                                                    }
+                                                },
+                                                {
+                                                    "text@we_ui.chest_label": {}
+                                                },
+                                                {
+                                                    "grid@we_ui.grid_items": {}
+                                                }
+                                            ]
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "chest_panel": {
+        "type": "panel",
+        "size": [
+            "100%",
+            "100%"
+        ],
+        "controls": [
+            {
+                "09@we_ui.chest_ui_template": {
+                    "$grid_size": [
+                        9,
+                        1
+                    ],
+                    "$condition": "§w§e§u§i§0§9"
+                }
+            },
+            {
+                "18@we_ui.chest_ui_template": {
+                    "$grid_size": [
+                        9,
+                        2
+                    ],
+                    "$condition": "§w§e§u§i§1§8"
+                }
+            },
+            {
+                "27@we_ui.chest_ui_template": {
+                    "$grid_size": [
+                        9,
+                        3
+                    ],
+                    "$condition": "§w§e§u§i§2§7"
+                }
+            },
+            {
+                "36@we_ui.chest_ui_template": {
+                    "$grid_size": [
+                        9,
+                        4
+                    ],
+                    "$condition": "§w§e§u§i§3§6"
+                }
+            },
+            {
+                "45@we_ui.chest_ui_template": {
+                    "$grid_size": [
+                        9,
+                        5
+                    ],
+                    "$condition": "§w§e§u§i§4§5"
+                }
+            },
+            {
+                "54@we_ui.chest_ui_template": {
+                    "$grid_size": [
+                        9,
+                        6
+                    ],
+                    "$condition": "§w§e§u§i§5§4"
+                }
+            }
+        ]
+    }
+}

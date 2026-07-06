@@ -1,0 +1,30 @@
+{
+    "format_version": 2,
+    "header": {
+        "name": "WE RP",
+        "description": "World Editor by PrimeStrat",
+        "uuid": "6267239d-c099-4ac2-b5b2-a4b1ca0c8eb0",
+        "version": [
+            1,
+            0,
+            0
+        ],
+        "min_engine_version": [
+            1,
+            26,
+            0
+        ]
+    },
+    "modules": [
+        {
+            "description": "World-edit UI resources.",
+            "type": "resources",
+            "uuid": "93ceb35c-9e83-4880-9ea6-5e5105c17e7e",
+            "version": [
+                1,
+                0,
+                0
+            ]
+        }
+    ]
+}
