@@ -1,4 +1,4 @@
-import { GameMode, ItemStack, Player, system, world } from "@minecraft/server";
+import { GameMode, ItemStack, Player, PlayerPermissionLevel, system, world } from "@minecraft/server";
 import { registerCommands } from "./commands/registry.js";
 import { clearWorldEditStructures } from "./operations/undo.js";
 import { setPos1, setPos2 } from "./session.js";
@@ -10,13 +10,17 @@ const POS1_COOLDOWN_TICKS = 5;
 const lastPos1Ticks = new Map();
 
 /**
- * Returns whether a player is wielding the selection wand in creative mode.
+ * Returns whether an opped player is wielding the selection wand in creative
+ * mode.
  * @param {Player} player The interacting player.
  * @param {ItemStack|undefined} itemStack The item used in the event.
  * @returns {boolean} True when the wand should act.
  */
 function isWandUse(player, itemStack) {
-    return Boolean(itemStack) && itemStack.typeId === WE_CONFIG.wandItemId && player.getGameMode() === GameMode.Creative;
+    return Boolean(itemStack)
+        && itemStack.typeId === WE_CONFIG.wandItemId
+        && player.getGameMode() === GameMode.Creative
+        && player.playerPermissionLevel === PlayerPermissionLevel.Operator;
 }
 
 system.beforeEvents.startup.subscribe(ev => {

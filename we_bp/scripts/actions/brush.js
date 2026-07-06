@@ -1,4 +1,4 @@
-import { EquipmentSlot, GameMode, ItemTypes, Player, ItemStack } from "@minecraft/server";
+import { EquipmentSlot, GameMode, ItemTypes, Player, PlayerPermissionLevel, ItemStack } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { parsePattern, patternErrorMessage, shortName } from "./common.js";
 import { sphereRuns } from "../shapes/sphere.js";
@@ -117,7 +117,7 @@ function unbindBrush(player) {
 function applyBrush(player, itemStack) {
     const byItem = brushes.get(player.name);
     const brush = byItem ? byItem.get(itemStack.typeId) : undefined;
-    if (!brush || player.getGameMode() !== GameMode.Creative) {
+    if (!brush || player.getGameMode() !== GameMode.Creative || player.playerPermissionLevel !== PlayerPermissionLevel.Operator) {
         return;
     }
     const hit = player.getBlockFromViewDirection({ maxDistance: WE_CONFIG.brushRange });
