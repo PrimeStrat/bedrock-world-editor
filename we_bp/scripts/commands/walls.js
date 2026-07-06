@@ -2,22 +2,34 @@ import { CommandPermissionLevel, CustomCommandParamType } from "@minecraft/serve
 import { getPlayer, toCommandResult, notPlayer } from "./common.js";
 import { buildSelectionShell } from "../actions/region.js";
 
-const wallsCommand = {
-    definition: {
-        name: "we:walls",
-        description: "Build the four side walls of the selection. Skips air unless includeAir is true.",
-        permissionLevel: CommandPermissionLevel.Admin,
-        cheatsRequired: false,
-        mandatoryParameters: [{ type: CustomCommandParamType.BlockType, name: "block" }],
-        optionalParameters: [{ type: CustomCommandParamType.Boolean, name: "includeAir" }]
-    },
-    handler(origin, block, includeAir) {
-        const player = getPlayer(origin);
-        if (!player) {
-            return notPlayer();
+/**
+ * Builds a selection-shell command entry.
+ * @param {string} name The command name.
+ * @param {string} kind Either "walls" or "faces".
+ * @param {boolean} usePattern When true, block accepts a pattern string.
+ * @returns {object} The command entry.
+ */
+function shellVariant(name, kind, usePattern) {
+    return {
+        definition: {
+            name,
+            description: (kind === "walls" ? "Build the four side walls of the selection" : "Build a hollow box shell around the selection") + " with a block" + (usePattern ? " pattern" : "") + ". Fills air too unless includeAir is false.",
+            permissionLevel: CommandPermissionLevel.Admin,
+            cheatsRequired: false,
+            mandatoryParameters: [{ type: usePattern ? CustomCommandParamType.String : CustomCommandParamType.BlockType, name: "block" }],
+            optionalParameters: [{ type: CustomCommandParamType.Boolean, name: "includeAir" }]
+        },
+        handler(origin, block, includeAir) {
+            const player = getPlayer(origin);
+            if (!player) {
+                return notPlayer();
+            }
+            return toCommandResult(buildSelectionShell(player, usePattern ? block : block.id, includeAir ?? true, kind));
         }
-        return toCommandResult(buildSelectionShell(player, block.id, Boolean(includeAir), "walls"));
-    }
-};
+    };
+}
 
-export { wallsCommand };
+const wallsCommand = shellVariant("we:walls", "walls", false);
+const ewallsCommand = shellVariant("we:ewalls", "walls", true);
+
+export { wallsCommand, ewallsCommand, shellVariant };

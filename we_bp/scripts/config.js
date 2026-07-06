@@ -1,13 +1,16 @@
 const WE_CONFIG = {
     wandItemId: "minecraft:wooden_axe",
-    maxBlocks: 10000000,
+    maxBlocks: Infinity,
     undoDepth: 50,
     undoSlots: 50,
     blocksPerYield: 32767,
-    fillSlab: 128,
+    fillSlab: 127,
     tickAreaChunkSpan: 8,
-    chunkLoadAttempts: 20,
-    capacityWaitTicks: 200
+    chunkLoadTicks: 600,
+    capacityWaitTicks: 200,
+    brushRange: 128,
+    brushMaxRadius: 5,
+    maxPatternBlocks: 1000000
 };
 
 export { WE_CONFIG };

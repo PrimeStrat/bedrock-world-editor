@@ -1,49 +1,62 @@
-import { world, system, BlockPermutation, BlockVolume, Dimension, Player } from "@minecraft/server";
+import { world, system, BlockVolume, Dimension, Player } from "@minecraft/server";
 import { pushUndo, setBusy } from "../session.js";
 import { WE_CONFIG } from "../config.js";
-import { CHUNK, chunkFloor, blockFilterFor } from "./util.js";
-import { tickAreaFor, releaseTickArea, pickAreaSpan } from "./ticking.js";
+import { CHUNK, chunkFloor, blockFilterFor, clampToHeight, pickPatternPermutation, cellMatchesFilter } from "./util.js";
+import { tickAreaFor, releaseTickArea, pickAreaSpan, areaFullyLoaded } from "./ticking.js";
 import { reserveBoxUndoSlot, snapshotBoxTiles } from "./undo.js";
+import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
+
+const CELLS_PER_YIELD = 256;
 
 /**
  * @typedef {{x: number, y: number, z: number}} Vec3
+ * @typedef {{entries: {permutation: object, weight: number}[], total: number, label: string}} FillPattern
  */
 
 /**
- * Fills an axis-aligned box with native fillBlocks calls. The prior region is
+ * Fills an axis-aligned box with a fill pattern. The prior region is
  * snapshotted into a grid of undo structures (each within the 64x384x64 size
  * limit) rather than read cell-by-cell, so a box edit stays cheap at any size.
  * @param {Player} player The player performing the edit.
  * @param {Dimension} dimension The dimension to edit.
  * @param {Vec3} min The inclusive box min corner.
  * @param {Vec3} max The inclusive box max corner.
- * @param {BlockPermutation} permutation The permutation to fill with.
+ * @param {FillPattern} pattern The fill pattern.
  * @param {string|null} matchId Only fill cells of this block id (replace), or null for any.
  * @param {boolean} includeAir When false, cells currently air are not filled.
  * @param {string} label A short label for history and the completion message.
  * @returns {void}
  */
-function runBoxEdit(player, dimension, min, max, permutation, matchId, includeAir, label) {
-    setBusy(player.name, true);
-    system.runJob(boxEditJob(dimension, min, max, permutation, matchId, includeAir, player.name, label));
+function runBoxEdit(player, dimension, min, max, pattern, matchId, includeAir, label) {
+    const box = clampToHeight(dimension, min, max);
+    const useBusy = !areaFullyLoaded(dimension, box.min, box.max);
+    if (useBusy) {
+        setBusy(player.name, true);
+    }
+    system.runJob(boxEditJob(dimension, box.min, box.max, pattern, matchId, includeAir, player.name, label, useBusy));
 }
 
 /**
  * Generator that fills a box in ticking-area batches: each batch spans as many
  * chunks as the ticking budget allows (capped by config), gets ticked until
- * loaded, is filled in chunk-column slabs (each within the native fillBlocks
- * cap), then the area moves on to the next batch. Accumulates the changed
- * count into a one-element result array.
+ * loaded, then filled. Single-block patterns fill in chunk-column slabs (each
+ * within the native fillBlocks cap); weighted patterns fill cell-by-cell with
+ * a random pick per cell. Accumulates the changed count into a one-element
+ * result array.
  * @param {Dimension} dimension The dimension to edit.
  * @param {Vec3} min The inclusive box min corner.
  * @param {Vec3} max The inclusive box max corner.
- * @param {BlockPermutation} permutation The permutation to fill with.
- * @param {object} blockFilter The prebuilt fillBlocks block filter.
+ * @param {FillPattern} pattern The fill pattern.
+ * @param {string|null} matchId Only fill cells of this block id, or null for any.
+ * @param {boolean} includeAir When false, cells currently air are not filled.
  * @param {number[]} outChanged A one-element array receiving the changed count.
  * @param {string} playerName The acting player's name.
  * @returns {Generator} The chunked fill generator.
  */
-function* fillBoxChunked(dimension, min, max, permutation, blockFilter, outChanged, playerName) {
+function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outChanged, playerName) {
+    const blockFilter = blockFilterFor(matchId, includeAir);
+    const single = pattern.entries.length === 1 && !matchId;
+    const filtered = Boolean(matchId) || !includeAir;
     let changed = 0;
     const span = pickAreaSpan();
     for (let ax = chunkFloor(min.x); ax <= max.x; ax += span) {
@@ -54,18 +67,45 @@ function* fillBoxChunked(dimension, min, max, permutation, blockFilter, outChang
             if (!ok) {
                 continue;
             }
-            for (let x = areaMin.x; x <= areaMax.x; x = chunkFloor(x) + CHUNK) {
-                for (let z = areaMin.z; z <= areaMax.z; z = chunkFloor(z) + CHUNK) {
-                    for (let y = areaMin.y; y <= areaMax.y; y += WE_CONFIG.fillSlab) {
-                        const subMin = { x, y, z };
-                        const subMax = {
-                            x: Math.min(chunkFloor(x) + CHUNK - 1, areaMax.x),
-                            y: Math.min(y + WE_CONFIG.fillSlab - 1, areaMax.y),
-                            z: Math.min(chunkFloor(z) + CHUNK - 1, areaMax.z)
-                        };
-                        const result = dimension.fillBlocks(new BlockVolume(subMin, subMax), permutation, { blockFilter });
-                        changed += result.getCapacity();
-                        yield;
+            if (single) {
+                for (let x = areaMin.x; x <= areaMax.x; x = chunkFloor(x) + CHUNK) {
+                    for (let z = areaMin.z; z <= areaMax.z; z = chunkFloor(z) + CHUNK) {
+                        for (let y = areaMin.y; y <= areaMax.y; y += WE_CONFIG.fillSlab) {
+                            const subMin = { x, y, z };
+                            const subMax = {
+                                x: Math.min(chunkFloor(x) + CHUNK - 1, areaMax.x),
+                                y: Math.min(y + WE_CONFIG.fillSlab - 1, areaMax.y),
+                                z: Math.min(chunkFloor(z) + CHUNK - 1, areaMax.z)
+                            };
+                            const result = dimension.fillBlocks(new BlockVolume(subMin, subMax), pattern.entries[0].permutation, { blockFilter });
+                            changed += result.getCapacity();
+                            debugProgress(playerName, changed);
+                            yield;
+                        }
+                    }
+                }
+            } else {
+                let sinceYield = 0;
+                for (let x = areaMin.x; x <= areaMax.x; x++) {
+                    for (let z = areaMin.z; z <= areaMax.z; z++) {
+                        for (let y = areaMin.y; y <= areaMax.y; y++) {
+                            const loc = { x, y, z };
+                            let allowed = true;
+                            if (filtered) {
+                                const block = dimension.getBlock(loc);
+                                allowed = Boolean(block) && cellMatchesFilter(block.typeId, matchId, includeAir);
+                            }
+                            if (allowed) {
+                                dimension.setBlockPermutation(loc, pickPatternPermutation(pattern));
+                                changed += 1;
+                            }
+                            sinceYield += 1;
+                            if (sinceYield >= CELLS_PER_YIELD) {
+                                sinceYield = 0;
+                                debugProgress(playerName, changed);
+                                yield;
+                            }
+                        }
                     }
                 }
             }
@@ -80,20 +120,21 @@ function* fillBoxChunked(dimension, min, max, permutation, blockFilter, outChang
  * @param {Dimension} dimension The dimension to edit.
  * @param {Vec3} min The inclusive box min corner.
  * @param {Vec3} max The inclusive box max corner.
- * @param {BlockPermutation} permutation The permutation to fill with.
+ * @param {FillPattern} pattern The fill pattern.
  * @param {string|null} matchId Only fill cells of this block id, or null for any.
  * @param {boolean} includeAir When false, cells currently air are not filled.
  * @param {string} playerName The editing player's name.
  * @param {string} label A short label for the completion message.
+ * @param {boolean} useBusy Whether this job holds the busy flag.
  * @returns {Generator} The box edit job generator.
  */
-function* boxEditJob(dimension, min, max, permutation, matchId, includeAir, playerName, label) {
-    const blockFilter = blockFilterFor(matchId, includeAir);
+function* boxEditJob(dimension, min, max, pattern, matchId, includeAir, playerName, label, useBusy) {
+    debugStart(playerName, label);
     const slot = reserveBoxUndoSlot(playerName);
     const tiles = [];
     yield* snapshotBoxTiles(dimension, min, max, playerName, slot, tiles);
     const outChanged = [0];
-    yield* fillBoxChunked(dimension, min, max, permutation, blockFilter, outChanged, playerName);
+    yield* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outChanged, playerName);
     releaseTickArea(playerName);
     pushUndo(playerName, {
         kind: "box",
@@ -101,16 +142,24 @@ function* boxEditJob(dimension, min, max, permutation, matchId, includeAir, play
         tiles,
         min: { x: min.x, y: min.y, z: min.z },
         max: { x: max.x, y: max.y, z: max.z },
-        fill: { permutation, matchId, includeAir },
+        fill: { pattern, matchId, includeAir },
         label,
         blocks: outChanged[0],
         tick: system.currentTick
     });
+    debugEnd(playerName);
     const acting = world.getAllPlayers().find((p) => p.name === playerName);
     if (acting) {
-        acting.sendMessage("§a" + label + ": §f" + outChanged[0] + "§a block(s) changed.");
+        let message = "§a" + label + "§a: §f" + outChanged[0] + "§a block(s) changed.";
+        const skipped = debugSkipped(playerName);
+        if (skipped > 0) {
+            message += " §c" + skipped + " batch(es) skipped - run /we:debug.";
+        }
+        acting.sendMessage(message);
     }
-    setBusy(playerName, false);
+    if (useBusy) {
+        setBusy(playerName, false);
+    }
 }
 
 /**
@@ -121,10 +170,11 @@ function* boxEditJob(dimension, min, max, permutation, matchId, includeAir, play
  * @returns {Generator} The box redo job generator.
  */
 function* refillBoxJob(dimension, record, playerName) {
-    const blockFilter = blockFilterFor(record.fill.matchId, record.fill.includeAir);
+    debugStart(playerName, "Redo " + record.label);
     const outChanged = [0];
-    yield* fillBoxChunked(dimension, record.min, record.max, record.fill.permutation, blockFilter, outChanged, playerName);
+    yield* fillBoxChunked(dimension, record.min, record.max, record.fill.pattern, record.fill.matchId, record.fill.includeAir, outChanged, playerName);
     releaseTickArea(playerName);
+    debugEnd(playerName);
     const player = world.getAllPlayers().find((p) => p.name === playerName);
     if (player) {
         player.sendMessage("§aRedo: §f" + outChanged[0] + "§a block(s) changed.");

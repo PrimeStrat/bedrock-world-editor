@@ -1,4 +1,4 @@
-import { BlockTypes, Player } from "@minecraft/server";
+import { BlockPermutation, BlockTypes, Player } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { getSelection, isBusy } from "../session.js";
 import { boxVolume } from "../operations/util.js";
@@ -20,6 +20,8 @@ const NO_SELECTION_MESSAGE = "§cSet both positions first (/we:pos1, /we:pos2 or
 /**
  * @typedef {{x: number, y: number, z: number}} Vec3
  * @typedef {{ok: boolean, message: string}} ActionResult
+ * @typedef {{permutation: BlockPermutation, weight: number}} PatternEntry
+ * @typedef {{entries: PatternEntry[], total: number, label: string}} FillPattern
  */
 
 /**
@@ -37,6 +39,62 @@ function resolveBlockId(id) {
 }
 
 /**
+ * Parses a fill pattern: one block id, or a weighted comma list like
+ * "50stone,50cobblestone" (Java-style "50%stone" also works). Entries without
+ * a weight count as weight 1.
+ * @param {string} text The pattern text.
+ * @returns {FillPattern|null} The pattern, or null when any entry is invalid.
+ */
+function parsePattern(text) {
+    const parts = String(text).split(",");
+    const entries = [];
+    const names = [];
+    let total = 0;
+    for (const part of parts) {
+        const match = part.trim().match(/^(?:(\d+)\s*%?\s*)?([a-z_][a-z0-9_:]*)$/i);
+        if (!match) {
+            return null;
+        }
+        const full = resolveBlockId(match[2]);
+        if (!full) {
+            return null;
+        }
+        const weight = match[1] ? Math.max(1, parseInt(match[1], 10)) : 1;
+        entries.push({ permutation: BlockPermutation.resolve(full), weight });
+        names.push(shortName(full));
+        total += weight;
+    }
+    if (entries.length === 0) {
+        return null;
+    }
+    return { entries, total, label: names.join(",") };
+}
+
+/**
+ * Returns the first invalid entry in a pattern text.
+ * @param {string} text The pattern text.
+ * @returns {string} The failing entry, or the whole text.
+ */
+function patternInvalidEntry(text) {
+    for (const part of String(text).split(",")) {
+        const match = part.trim().match(/^(?:(\d+)\s*%?\s*)?([a-z_][a-z0-9_:]*)$/i);
+        if (!match || !resolveBlockId(match[2])) {
+            return part.trim();
+        }
+    }
+    return String(text);
+}
+
+/**
+ * Builds the error message for an invalid pattern, naming the failing entry.
+ * @param {string} text The pattern text.
+ * @returns {string} The error message.
+ */
+function patternErrorMessage(text) {
+    return "§cUnknown block in pattern: §b" + patternInvalidEntry(text) + "§c.";
+}
+
+/**
  * Returns the unit vector for a named direction, or the player's dominant view
  * axis when no name is given.
  * @param {Player} player The acting player.
@@ -47,7 +105,11 @@ function directionOrView(player, name) {
     if (name) {
         return DIRECTIONS[name] ?? null;
     }
-    return axisFromView(player.getViewDirection());
+    const view = player.getViewDirection();
+    if (Math.abs(view.y) >= Math.abs(view.x) && Math.abs(view.y) >= Math.abs(view.z)) {
+        return { x: 0, y: view.y >= 0 ? 1 : -1, z: 0 };
+    }
+    return axisFromView(view);
 }
 
 /**
@@ -109,4 +171,4 @@ function shortName(id) {
     return colon === -1 ? id : id.slice(colon + 1);
 }
 
-export { DIRECTIONS, AIR_ID, NO_SELECTION_MESSAGE, resolveBlockId, directionOrView, blockUnder, busyGuard, requireRegion, shortName };
+export { DIRECTIONS, AIR_ID, NO_SELECTION_MESSAGE, resolveBlockId, parsePattern, patternErrorMessage, directionOrView, blockUnder, busyGuard, requireRegion, shortName };

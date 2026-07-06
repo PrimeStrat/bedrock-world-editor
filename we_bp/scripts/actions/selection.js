@@ -9,6 +9,23 @@ import { DIRECTIONS, NO_SELECTION_MESSAGE, directionOrView, blockUnder } from ".
  */
 
 /**
+ * Returns a size note for position-set messages, or an empty string until
+ * both corners exist.
+ * @param {string} playerName The player's name.
+ * @returns {string} The size suffix.
+ */
+function selectionSizeSuffix(playerName) {
+    const { pos1, pos2 } = getSelection(playerName);
+    if (!pos1 || !pos2) {
+        return "";
+    }
+    const dx = Math.abs(pos1.x - pos2.x) + 1;
+    const dy = Math.abs(pos1.y - pos2.y) + 1;
+    const dz = Math.abs(pos1.z - pos2.z) + 1;
+    return " §7(" + (dx * dy * dz) + ")";
+}
+
+/**
  * Sets a selection position to the player's current block location.
  * @param {Player} player The acting player.
  * @param {number} which Either 1 or 2.
@@ -21,7 +38,7 @@ function setPositionHere(player, which) {
     } else {
         setPos2(player.name, loc);
     }
-    return { ok: true, message: "§aPos" + which + " set to §f" + loc.x + " " + loc.y + " " + loc.z + "§a." };
+    return { ok: true, message: "§aPos" + which + " set to §f" + loc.x + " " + loc.y + " " + loc.z + "§a." + selectionSizeSuffix(player.name) };
 }
 
 /**
@@ -169,4 +186,4 @@ function outsetSelection(player, amount, inward) {
     return { ok: true, message: "§aSelection " + (inward ? "inset" : "outset") + "." };
 }
 
-export { setPositionHere, giveWand, deselect, selectionInfo, expandSelection, contractSelection, shiftSelection, outsetSelection };
+export { setPositionHere, giveWand, deselect, selectionInfo, selectionSizeSuffix, expandSelection, contractSelection, shiftSelection, outsetSelection };

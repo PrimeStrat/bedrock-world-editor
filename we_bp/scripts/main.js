@@ -3,6 +3,8 @@ import { registerCommands } from "./commands/registry.js";
 import { clearWorldEditStructures } from "./operations/undo.js";
 import { setPos1, setPos2 } from "./session.js";
 import { WE_CONFIG } from "./config.js";
+import { applyBrush } from "./actions/brush.js";
+import { selectionSizeSuffix } from "./actions/selection.js";
 
 const POS1_COOLDOWN_TICKS = 5;
 const lastPos1Ticks = new Map();
@@ -40,8 +42,14 @@ world.beforeEvents.playerBreakBlock.subscribe(ev => {
     const loc = ev.block.location;
     setPos1(player.name, loc);
     system.run(() => {
-        player.sendMessage("§aPos1 set to §f" + loc.x + " " + loc.y + " " + loc.z + "§a.");
+        player.sendMessage("§aPos1 set to §f" + loc.x + " " + loc.y + " " + loc.z + "§a." + selectionSizeSuffix(player.name));
     });
+});
+
+world.afterEvents.itemUse.subscribe(ev => {
+    if (ev.source.getGameMode() == GameMode.Creative) {
+        applyBrush(ev.source, ev.itemStack);
+    }
 });
 
 world.beforeEvents.playerInteractWithBlock.subscribe(ev => {
@@ -53,6 +61,6 @@ world.beforeEvents.playerInteractWithBlock.subscribe(ev => {
     const loc = ev.block.location;
     setPos2(player.name, loc);
     system.run(() => {
-        player.sendMessage("§aPos2 set to §f" + loc.x + " " + loc.y + " " + loc.z + "§a.");
+        player.sendMessage("§aPos2 set to §f" + loc.x + " " + loc.y + " " + loc.z + "§a." + selectionSizeSuffix(player.name));
     });
 });

@@ -2,24 +2,35 @@ import { CommandPermissionLevel, CustomCommandParamType } from "@minecraft/serve
 import { getPlayer, toCommandResult, notPlayer } from "./common.js";
 import { replaceBlocks } from "../actions/region.js";
 
-const replaceCommand = {
-    definition: {
-        name: "we:replace",
-        description: "Replace one block with another inside the selection.",
-        permissionLevel: CommandPermissionLevel.Admin,
-        cheatsRequired: false,
-        mandatoryParameters: [
-            { type: CustomCommandParamType.BlockType, name: "from" },
-            { type: CustomCommandParamType.BlockType, name: "to" }
-        ]
-    },
-    handler(origin, from, to) {
-        const player = getPlayer(origin);
-        if (!player) {
-            return notPlayer();
+/**
+ * Builds a selection-replace command entry.
+ * @param {string} name The command name.
+ * @param {boolean} usePattern When true, "to" accepts a pattern string.
+ * @returns {object} The command entry.
+ */
+function replaceVariant(name, usePattern) {
+    return {
+        definition: {
+            name,
+            description: "Replace one block with another block" + (usePattern ? " pattern (e.g. 50stone,50cobblestone)" : "") + " inside the selection.",
+            permissionLevel: CommandPermissionLevel.Admin,
+            cheatsRequired: false,
+            mandatoryParameters: [
+                { type: CustomCommandParamType.BlockType, name: "from" },
+                { type: usePattern ? CustomCommandParamType.String : CustomCommandParamType.BlockType, name: "to" }
+            ]
+        },
+        handler(origin, from, to) {
+            const player = getPlayer(origin);
+            if (!player) {
+                return notPlayer();
+            }
+            return toCommandResult(replaceBlocks(player, from.id, usePattern ? to : to.id));
         }
-        return toCommandResult(replaceBlocks(player, from.id, to.id));
-    }
-};
+    };
+}
 
-export { replaceCommand };
+const replaceCommand = replaceVariant("we:replace", false);
+const ereplaceCommand = replaceVariant("we:ereplace", true);
+
+export { replaceCommand, ereplaceCommand };

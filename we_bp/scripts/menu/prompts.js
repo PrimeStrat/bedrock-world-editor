@@ -23,9 +23,9 @@ function directionFromIndex(index) {
  * @returns {Promise<{blockId: string, includeAir: boolean}|null>} The inputs, or null.
  */
 async function promptBlock(player, title, withAir) {
-    const form = new ModalFormData().title(title).textField("Block id", "stone");
+    const form = new ModalFormData().title(title).textField("Block or pattern", "stone or 50stone,50cobblestone");
     if (withAir) {
-        form.toggle("Include air", { defaultValue: false });
+        form.toggle("Include air", { defaultValue: true });
     }
     const response = await form.show(player);
     if (response.canceled || !response.formValues) {
@@ -44,7 +44,7 @@ async function promptTwoBlocks(player, title) {
     const form = new ModalFormData()
         .title(title)
         .textField("Replace block id", "stone")
-        .textField("With block id", "dirt");
+        .textField("With block or pattern", "dirt or 50dirt,50gravel");
     const response = await form.show(player);
     if (response.canceled || !response.formValues) {
         return null;
@@ -89,9 +89,9 @@ async function promptShape(player, title, sizeLabel, sizeMax, withHeight) {
     if (withHeight) {
         form.slider("Height", 1, 128, { valueStep: 1, defaultValue: 10 });
     }
-    form.textField("Block id", "stone");
+    form.textField("Block or pattern", "stone or 50stone,50cobblestone");
     form.toggle("Hollow", { defaultValue: false });
-    form.toggle("Include air", { defaultValue: false });
+    form.toggle("Include air", { defaultValue: true });
     const response = await form.show(player);
     if (response.canceled || !response.formValues) {
         return null;
@@ -108,6 +108,70 @@ async function promptShape(player, title, sizeLabel, sizeMax, withHeight) {
     const hollow = Boolean(values[index + 1]);
     const includeAir = Boolean(values[index + 2]);
     return { size, height, blockId, hollow, includeAir };
+}
+
+/**
+ * Prompts for a brush: radius, optional height, block or pattern, tool item,
+ * and hollow/include-air toggles.
+ * @param {Player} player The player to prompt.
+ * @param {string} title The form title.
+ * @param {boolean} withHeight Whether to show a height slider.
+ * @returns {Promise<{radius: number, height: number, blockText: string, itemText: string, hollow: boolean, includeAir: boolean}|null>} The inputs, or null.
+ */
+async function promptBrush(player, title, withHeight) {
+    const form = new ModalFormData().title(title).slider("Radius", 1, 5, { valueStep: 1, defaultValue: 3 });
+    if (withHeight) {
+        form.slider("Height", 1, 32, { valueStep: 1, defaultValue: 4 });
+    }
+    form.textField("Block or pattern", "stone or 50stone,50cobblestone");
+    form.textField("Tool item id (blank = held tool)", "iron_shovel");
+    form.toggle("Hollow", { defaultValue: false });
+    form.toggle("Include air", { defaultValue: true });
+    const response = await form.show(player);
+    if (response.canceled || !response.formValues) {
+        return null;
+    }
+    const values = response.formValues;
+    let index = 0;
+    const radius = Number(values[index]);
+    index += 1;
+    const height = withHeight ? Number(values[index]) : 1;
+    if (withHeight) {
+        index += 1;
+    }
+    const blockText = String(values[index]);
+    const itemText = String(values[index + 1]);
+    const hollow = Boolean(values[index + 2]);
+    const includeAir = Boolean(values[index + 3]);
+    return { radius, height, blockText, itemText, hollow, includeAir };
+}
+
+const GENERATE_PRESETS = [
+    { name: "Custom", expression: "" },
+    { name: "Sphere", expression: "x^2+y^2+z^2<1" },
+    { name: "Torus", expression: "(0.75-sqrt(x^2+z^2))^2+y^2<0.25^2" },
+    { name: "Cone", expression: "sqrt(x^2+z^2)<(1-y)/2" },
+    { name: "Waves", expression: "y<sin(x*pi)*sin(z*pi)*0.5" }
+];
+
+/**
+ * Prompts for a generate expression (preset or custom) and a block.
+ * @param {Player} player The player to prompt.
+ * @returns {Promise<{expression: string, blockText: string}|null>} The inputs, or null.
+ */
+async function promptGenerate(player) {
+    const form = new ModalFormData()
+        .title("Generate")
+        .dropdown("Preset", GENERATE_PRESETS.map((preset) => preset.name), { defaultValueIndex: 0 })
+        .textField("Custom expression (x, y, z span -1 to 1)", "x^2+y^2+z^2<1")
+        .textField("Block or pattern", "stone");
+    const response = await form.show(player);
+    if (response.canceled || !response.formValues) {
+        return null;
+    }
+    const preset = GENERATE_PRESETS[Number(response.formValues[0])];
+    const expression = preset.expression === "" ? String(response.formValues[1]) : preset.expression;
+    return { expression, blockText: String(response.formValues[2]) };
 }
 
 /**
@@ -157,4 +221,4 @@ async function promptFlipAxis(player) {
     return Number(response.formValues[0]) === 0 ? "x" : "z";
 }
 
-export { promptBlock, promptTwoBlocks, promptAmount, promptShape, promptRadius, promptRotation, promptFlipAxis };
+export { promptBlock, promptTwoBlocks, promptAmount, promptShape, promptBrush, promptGenerate, promptRadius, promptRotation, promptFlipAxis };

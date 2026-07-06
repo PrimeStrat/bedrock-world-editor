@@ -2,7 +2,7 @@
     "namespace": "we_ui",
     "chest_label": {
         "type": "label",
-        "text": "#title_text",
+        "text": "#text",
         "color": [
             0.4,
             0.26,
@@ -10,13 +10,24 @@
         ],
         "layer": 2,
         "anchor_from": "bottom_left",
-        "anchor_to": "bottom_left"
+        "anchor_to": "bottom_left",
+        "bindings": [
+            {
+                "binding_name": "#title_text",
+                "binding_type": "global"
+            },
+            {
+                "binding_type": "view",
+                "source_property_name": "((#title_text - $condition) - '§r')",
+                "target_property_name": "#text"
+            }
+        ]
     },
     "grid_items": {
         "type": "grid",
         "size": [
             "100%",
-            "default"
+            "100%c"
         ],
         "offset": [
             0,
@@ -25,7 +36,13 @@
         "grid_dimensions": "$grid_size",
         "grid_item_template": "we_ui.inventory_item_panel",
         "collection_name": "form_buttons",
-        "layer": 1
+        "layer": 1,
+        "bindings": [
+            {
+                "binding_name": "#form_button_contents",
+                "binding_name_override": "#collection_length"
+            }
+        ]
     },
     "inventory_item_panel": {
         "type": "panel",
@@ -63,6 +80,10 @@
                 "source_property_name": "(not (#form_button_text = ''))",
                 "target_property_name": "#visible",
                 "binding_condition": "always"
+            },
+            {
+                "binding_type": "collection_details",
+                "binding_collection_name": "form_buttons"
             }
         ],
         "controls": [
@@ -152,7 +173,7 @@
             },
             {
                 "binding_type": "view",
-                "source_property_name": "(#form_button_text - ('%.1s' * #form_button_text))",
+                "source_property_name": "#form_button_text",
                 "target_property_name": "#hover_text"
             }
         ]
@@ -217,7 +238,7 @@
                                             "type": "stack_panel",
                                             "orientation": "vertical",
                                             "size": [
-                                                "198px",
+                                                "234px",
                                                 "100%c"
                                             ],
                                             "controls": [

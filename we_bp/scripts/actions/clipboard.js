@@ -1,9 +1,9 @@
-import { system, BlockPermutation, Player } from "@minecraft/server";
+import { system, Player } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { getSelection } from "../session.js";
 import { runBoxEdit } from "../operations/box.js";
 import { copySelection, pasteClipboard, rotateClipboard, flipClipboard, clearClipboardForPlayer, stackSelection } from "../clipboard.js";
-import { AIR_ID, NO_SELECTION_MESSAGE, busyGuard, directionOrView, requireRegion } from "./common.js";
+import { AIR_ID, NO_SELECTION_MESSAGE, parsePattern, busyGuard, directionOrView, requireRegion } from "./common.js";
 
 /**
  * @typedef {{ok: boolean, message: string}} ActionResult
@@ -47,7 +47,7 @@ function cutRegion(player) {
             player.sendMessage("§c" + result.message);
             return;
         }
-        runBoxEdit(player, player.dimension, region.min, region.max, BlockPermutation.resolve(AIR_ID), null, true, "Cut");
+        runBoxEdit(player, player.dimension, region.min, region.max, parsePattern(AIR_ID), null, true, "Cut");
     });
     return { ok: true, message: "§aCut started..." };
 }

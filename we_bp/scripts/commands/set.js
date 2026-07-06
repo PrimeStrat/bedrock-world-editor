@@ -2,22 +2,34 @@ import { CommandPermissionLevel, CustomCommandParamType } from "@minecraft/serve
 import { getPlayer, toCommandResult, notPlayer } from "./common.js";
 import { setBlocks } from "../actions/region.js";
 
-const setCommand = {
-    definition: {
-        name: "we:set",
-        description: "Fill the selection with a block. Skips air unless includeAir is true.",
-        permissionLevel: CommandPermissionLevel.Admin,
-        cheatsRequired: false,
-        mandatoryParameters: [{ type: CustomCommandParamType.BlockType, name: "block" }],
-        optionalParameters: [{ type: CustomCommandParamType.Boolean, name: "includeAir" }]
-    },
-    handler(origin, block, includeAir) {
-        const player = getPlayer(origin);
-        if (!player) {
-            return notPlayer();
+/**
+ * Builds a selection-fill command entry.
+ * @param {string} name The command name.
+ * @param {string} label The history label.
+ * @param {boolean} usePattern When true, block accepts a pattern string.
+ * @returns {object} The command entry.
+ */
+function setVariant(name, label, usePattern) {
+    return {
+        definition: {
+            name,
+            description: "Fill the selection with a block" + (usePattern ? " pattern (e.g. 50stone,50cobblestone)" : "") + ". Fills air too unless includeAir is false.",
+            permissionLevel: CommandPermissionLevel.Admin,
+            cheatsRequired: false,
+            mandatoryParameters: [{ type: usePattern ? CustomCommandParamType.String : CustomCommandParamType.BlockType, name: "block" }],
+            optionalParameters: [{ type: CustomCommandParamType.Boolean, name: "includeAir" }]
+        },
+        handler(origin, block, includeAir) {
+            const player = getPlayer(origin);
+            if (!player) {
+                return notPlayer();
+            }
+            return toCommandResult(setBlocks(player, usePattern ? block : block.id, includeAir ?? true, label));
         }
-        return toCommandResult(setBlocks(player, block.id, Boolean(includeAir), "Set"));
-    }
-};
+    };
+}
 
-export { setCommand };
+const setCommand = setVariant("we:set", "Set", false);
+const esetCommand = setVariant("we:eset", "Set", true);
+
+export { setCommand, esetCommand, setVariant };

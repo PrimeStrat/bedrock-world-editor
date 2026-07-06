@@ -2,11 +2,11 @@ import { system, Player } from "@minecraft/server";
 import { ActionFormData, FormCancelationReason } from "@minecraft/server-ui";
 
 const CHEST_TITLE_27 = "§w§e§u§i§2§7§r";
-const NEUTRAL_CODE = "";
+const NEUTRAL_CODE = "";
 const CHEST_SLOTS = 27;
 
 /**
- * @typedef {{slot: number, icon: string, hover: string, run: function(Player):void}} ChestEntry
+ * @typedef {{slot: number, icon: string, hover: string, run: function(Player):void, menu: boolean|undefined}} ChestEntry
  */
 
 /**
@@ -16,10 +16,10 @@ const CHEST_SLOTS = 27;
  * @returns {Promise<import("@minecraft/server-ui").ActionFormResponse>} The response.
  */
 async function showFormUntilSeen(player, form) {
-    let response = await form.show(player);
-    while (response.canceled && response.cancelationReason === FormCancelationReason.UserBusy) {
+    const response = await form.show(player);
+    if (response.canceled && response.cancelationReason === FormCancelationReason.UserBusy) {
         await new Promise((resolve) => system.run(resolve));
-        response = await form.show(player);
+        return showFormUntilSeen(player, form);
     }
     return response;
 }
@@ -27,10 +27,12 @@ async function showFormUntilSeen(player, form) {
 /**
  * Shows a 27-slot chest menu (routed by the shared chest UI title sentinel).
  * Empty slots render invisible; each entry's hover text shows as its tooltip.
+ * After an action entry runs the menu re-shows; entries flagged menu hand off
+ * to another menu instead, and a real cancel (Esc/close) exits.
  * @param {Player} player The player to show to.
  * @param {string} title The chest label text.
  * @param {ChestEntry[]} entries The populated slots.
- * @returns {Promise<void>} Resolves after the selected entry runs.
+ * @returns {Promise<void>} Resolves when the menu is closed or handed off.
  */
 async function showChestMenu(player, title, entries) {
     const form = new ActionFormData().title(CHEST_TITLE_27 + title);
@@ -54,9 +56,15 @@ async function showChestMenu(player, title, entries) {
         return;
     }
     const entry = ordered[response.selection];
-    if (entry) {
-        entry.run(player);
+    if (!entry) {
+        return;
     }
+    if (entry.menu) {
+        entry.run(player);
+        return;
+    }
+    await entry.run(player);
+    return showChestMenu(player, title, entries);
 }
 
 export { showChestMenu, showFormUntilSeen };

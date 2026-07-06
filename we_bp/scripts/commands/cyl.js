@@ -2,31 +2,44 @@ import { CommandPermissionLevel, CustomCommandParamType } from "@minecraft/serve
 import { getPlayer, toCommandResult, notPlayer } from "./common.js";
 import { buildCylinder } from "../actions/generation.js";
 
-const cylCommand = {
-    definition: {
-        name: "we:cyl",
-        description: "Build a vertical cylinder at your location. Pass hollow=true for a tube.",
-        permissionLevel: CommandPermissionLevel.Admin,
-        cheatsRequired: false,
-        mandatoryParameters: [
-            { type: CustomCommandParamType.Integer, name: "radius" },
-            { type: CustomCommandParamType.Integer, name: "height" },
-            { type: CustomCommandParamType.BlockType, name: "block" }
-        ],
-        optionalParameters: [
-            { type: CustomCommandParamType.Boolean, name: "hollow" },
-            { type: CustomCommandParamType.Location, name: "base" },
-            { type: CustomCommandParamType.Boolean, name: "includeAir" }
-        ]
-    },
-    handler(origin, radius, height, block, hollow, base, includeAir) {
-        const player = getPlayer(origin);
-        if (!player) {
-            return notPlayer();
+/**
+ * Builds a cylinder command entry.
+ * @param {string} name The command name.
+ * @param {boolean} usePattern When true, block accepts a pattern string.
+ * @param {boolean} hollow Whether only the wall is built.
+ * @returns {object} The command entry.
+ */
+function cylVariant(name, usePattern, hollow) {
+    return {
+        definition: {
+            name,
+            description: "Build a " + (hollow ? "hollow " : "") + "vertical cylinder from a block" + (usePattern ? " pattern (e.g. 50stone,50cobblestone)" : "") + " at your location.",
+            permissionLevel: CommandPermissionLevel.Admin,
+            cheatsRequired: false,
+            mandatoryParameters: [
+                { type: CustomCommandParamType.Integer, name: "radius" },
+                { type: CustomCommandParamType.Integer, name: "height" },
+                { type: usePattern ? CustomCommandParamType.String : CustomCommandParamType.BlockType, name: "block" }
+            ],
+            optionalParameters: [
+                { type: CustomCommandParamType.Location, name: "base" },
+                { type: CustomCommandParamType.Boolean, name: "includeAir" }
+            ]
+        },
+        handler(origin, radius, height, block, base, includeAir) {
+            const player = getPlayer(origin);
+            if (!player) {
+                return notPlayer();
+            }
+            const b = base ? { x: Math.floor(base.x), y: Math.floor(base.y), z: Math.floor(base.z) } : null;
+            return toCommandResult(buildCylinder(player, radius, height, usePattern ? block : block.id, hollow, includeAir ?? true, b));
         }
-        const b = base ? { x: Math.floor(base.x), y: Math.floor(base.y), z: Math.floor(base.z) } : null;
-        return toCommandResult(buildCylinder(player, radius, height, block.id, Boolean(hollow), Boolean(includeAir), b));
-    }
-};
+    };
+}
 
-export { cylCommand };
+const cylCommand = cylVariant("we:cyl", false, false);
+const ecylCommand = cylVariant("we:ecyl", true, false);
+const hcylCommand = cylVariant("we:hcyl", false, true);
+const ehcylCommand = cylVariant("we:ehcyl", true, true);
+
+export { cylCommand, ecylCommand, hcylCommand, ehcylCommand };

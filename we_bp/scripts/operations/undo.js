@@ -2,6 +2,7 @@ import { world, StructureSaveMode, Dimension } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { TILE, TILE_HEIGHT } from "./util.js";
 import { tickAreaFor } from "./ticking.js";
+import { debugStatus } from "./debug.js";
 
 const boxUndoCounters = new Map();
 const boxUndoSlotTiles = new Map();
@@ -51,6 +52,7 @@ function reserveBoxUndoSlot(playerName) {
 function* snapshotBoxTiles(dimension, min, max, playerName, slot, tiles) {
     const ids = [];
     let index = 0;
+    const total = Math.ceil((max.x - min.x + 1) / TILE) * Math.ceil((max.z - min.z + 1) / TILE) * Math.ceil((max.y - min.y + 1) / TILE_HEIGHT);
     for (let tx = min.x; tx <= max.x; tx += TILE) {
         for (let tz = min.z; tz <= max.z; tz += TILE) {
             const tileMaxX = Math.min(tx + TILE - 1, max.x);
@@ -67,8 +69,72 @@ function* snapshotBoxTiles(dimension, min, max, playerName, slot, tiles) {
                 world.structureManager.createFromWorld(id, dimension, { x: tx, y: ty, z: tz }, { x: tileMaxX, y: tileMaxY, z: tileMaxZ }, { saveMode: StructureSaveMode.World, includeEntities: false });
                 tiles.push({ id, x: tx, y: ty, z: tz });
                 ids.push(id);
+                debugStatus(playerName, "§7Undo snapshot: §f" + index + "/" + total + "§7 tile(s)...");
                 yield;
             }
+        }
+    }
+    boxUndoSlotTiles.get(playerName).set(slot, ids);
+}
+
+/**
+ * Generator that snapshots only the tiles a shape's runs touch, each clamped
+ * to the runs' Y extent within that tile, so a sparse shape snapshots far
+ * less than its bounding box.
+ * @param {Dimension} dimension The dimension to snapshot.
+ * @param {{x: number, y: number, z: number, length: number}[]} runs The shape runs.
+ * @param {Vec3} bboxMin The inclusive bounding box min corner.
+ * @param {Vec3} bboxMax The inclusive bounding box max corner.
+ * @param {string} playerName The editing player's name.
+ * @param {number} slot The reserved undo slot.
+ * @param {object[]} tiles The array to fill with tile descriptors.
+ * @returns {Generator} The snapshot job generator.
+ */
+function* snapshotRunTiles(dimension, runs, bboxMin, bboxMax, playerName, slot, tiles) {
+    const bounds = new Map();
+    for (const run of runs) {
+        if (run.y < bboxMin.y || run.y > bboxMax.y || run.z < bboxMin.z || run.z > bboxMax.z) {
+            continue;
+        }
+        const startX = Math.max(run.x, bboxMin.x);
+        const endX = Math.min(run.x + run.length - 1, bboxMax.x);
+        if (startX > endX) {
+            continue;
+        }
+        const tz = Math.floor((run.z - bboxMin.z) / TILE);
+        const txEnd = Math.floor((endX - bboxMin.x) / TILE);
+        for (let tx = Math.floor((startX - bboxMin.x) / TILE); tx <= txEnd; tx++) {
+            const key = tx + "," + tz;
+            const entry = bounds.get(key);
+            if (!entry) {
+                bounds.set(key, { tx, tz, minY: run.y, maxY: run.y });
+            } else {
+                entry.minY = Math.min(entry.minY, run.y);
+                entry.maxY = Math.max(entry.maxY, run.y);
+            }
+        }
+    }
+    const ids = [];
+    let index = 0;
+    for (const entry of bounds.values()) {
+        const minX = bboxMin.x + entry.tx * TILE;
+        const maxX = Math.min(minX + TILE - 1, bboxMax.x);
+        const minZ = bboxMin.z + entry.tz * TILE;
+        const maxZ = Math.min(minZ + TILE - 1, bboxMax.z);
+        const ok = yield* tickAreaFor(dimension, { x: minX, y: entry.minY, z: minZ }, { x: maxX, y: entry.maxY, z: maxZ }, playerName);
+        for (let ty = entry.minY; ty <= entry.maxY; ty += TILE_HEIGHT) {
+            const tileMaxY = Math.min(ty + TILE_HEIGHT - 1, entry.maxY);
+            const id = "we:undo_" + playerName.toLowerCase() + "_" + slot + "_" + index;
+            index += 1;
+            if (!ok) {
+                continue;
+            }
+            world.structureManager.delete(id);
+            world.structureManager.createFromWorld(id, dimension, { x: minX, y: ty, z: minZ }, { x: maxX, y: tileMaxY, z: maxZ }, { saveMode: StructureSaveMode.World, includeEntities: false });
+            tiles.push({ id, x: minX, y: ty, z: minZ });
+            ids.push(id);
+            debugStatus(playerName, "§7Undo snapshot: §f" + index + "/" + bounds.size + "§7 tile(s)...");
+            yield;
         }
     }
     boxUndoSlotTiles.get(playerName).set(slot, ids);
@@ -95,4 +161,4 @@ function clearWorldEditStructures() {
     return count;
 }
 
-export { reserveBoxUndoSlot, snapshotBoxTiles, clearWorldEditStructures };
+export { reserveBoxUndoSlot, snapshotBoxTiles, snapshotRunTiles, clearWorldEditStructures };

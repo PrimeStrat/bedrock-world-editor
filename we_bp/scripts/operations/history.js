@@ -4,6 +4,7 @@ import { WE_CONFIG } from "../config.js";
 import { tickAreaFor, releaseTickArea } from "./ticking.js";
 import { refillBoxJob } from "./box.js";
 import { refillShapeJob } from "./shape.js";
+import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
 
 /**
  * @typedef {{x: number, y: number, z: number}} Vec3
@@ -57,6 +58,8 @@ function applyRedo(player, record) {
  * @returns {Generator} The tile placement job generator.
  */
 function* placeTilesJob(dimension, tiles, playerName, blocks) {
+    debugStart(playerName, "Undo (" + tiles.length + " tiles)");
+    let placed = 0;
     for (const tile of tiles) {
         const structure = world.structureManager.get(tile.id);
         if (!structure) {
@@ -69,12 +72,20 @@ function* placeTilesJob(dimension, tiles, playerName, blocks) {
             continue;
         }
         world.structureManager.place(tile.id, dimension, min, { includeEntities: false });
+        placed += 1;
+        debugProgress(playerName, placed);
         yield;
     }
     releaseTickArea(playerName);
+    debugEnd(playerName);
     const player = world.getAllPlayers().find((p) => p.name === playerName);
     if (player) {
-        player.sendMessage("§aUndo: §f" + blocks + "§a block(s) restored.");
+        let message = "§aUndo: §f" + blocks + "§a block(s) restored.";
+        const skipped = debugSkipped(playerName);
+        if (skipped > 0) {
+            message += " §c" + skipped + " tile(s) skipped - run /we:debug.";
+        }
+        player.sendMessage(message);
     }
     setBusy(playerName, false);
 }

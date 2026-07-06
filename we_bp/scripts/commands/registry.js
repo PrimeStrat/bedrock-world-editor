@@ -10,13 +10,13 @@ import { contractCommand } from "./contract.js";
 import { shiftCommand } from "./shift.js";
 import { outsetCommand } from "./outset.js";
 import { insetCommand } from "./inset.js";
-import { setCommand } from "./set.js";
-import { cubeCommand } from "./cube.js";
-import { hcubeCommand } from "./hcube.js";
-import { wallsCommand } from "./walls.js";
-import { replaceCommand } from "./replace.js";
+import { setCommand, esetCommand } from "./set.js";
+import { cubeCommand, ecubeCommand } from "./cube.js";
+import { hcubeCommand, ehcubeCommand } from "./hcube.js";
+import { wallsCommand, ewallsCommand } from "./walls.js";
+import { replaceCommand, ereplaceCommand } from "./replace.js";
 import { hollowCommand } from "./hollow.js";
-import { overlayCommand } from "./overlay.js";
+import { overlayCommand, eoverlayCommand } from "./overlay.js";
 import { moveCommand } from "./move.js";
 import { countCommand } from "./count.js";
 import { copyCommand } from "./copy.js";
@@ -26,10 +26,10 @@ import { rotateCommand } from "./rotate.js";
 import { flipCommand } from "./flip.js";
 import { clearClipboardCommand } from "./clearclipboard.js";
 import { stackCommand } from "./stack.js";
-import { sphereCommand } from "./sphere.js";
-import { cylCommand } from "./cyl.js";
-import { pyramidCommand } from "./pyramid.js";
-import { replaceNearCommand } from "./replacenear.js";
+import { sphereCommand, esphereCommand, hsphereCommand, ehsphereCommand } from "./sphere.js";
+import { cylCommand, ecylCommand, hcylCommand, ehcylCommand } from "./cyl.js";
+import { pyramidCommand, epyramidCommand, hpyramidCommand, ehpyramidCommand } from "./pyramid.js";
+import { replaceNearCommand, ereplaceNearCommand } from "./replacenear.js";
 import { removeNearCommand } from "./removenear.js";
 import { drainCommand } from "./drain.js";
 import { undoCommand } from "./undo.js";
@@ -44,6 +44,9 @@ import { ceilCommand } from "./ceil.js";
 import { thruCommand } from "./thru.js";
 import { jumpToCommand } from "./jumpto.js";
 import { menuCommand } from "./menu.js";
+import { debugCommand } from "./debug.js";
+import { brushCommand, ebrushCommand } from "./brush.js";
+import { generateCommand } from "./generate.js";
 
 const COMMANDS = [
     pos1Command,
@@ -57,12 +60,18 @@ const COMMANDS = [
     outsetCommand,
     insetCommand,
     setCommand,
+    esetCommand,
     cubeCommand,
+    ecubeCommand,
     hcubeCommand,
+    ehcubeCommand,
     wallsCommand,
+    ewallsCommand,
     replaceCommand,
+    ereplaceCommand,
     hollowCommand,
     overlayCommand,
+    eoverlayCommand,
     moveCommand,
     countCommand,
     copyCommand,
@@ -73,9 +82,19 @@ const COMMANDS = [
     clearClipboardCommand,
     stackCommand,
     sphereCommand,
+    esphereCommand,
+    hsphereCommand,
+    ehsphereCommand,
     cylCommand,
+    ecylCommand,
+    hcylCommand,
+    ehcylCommand,
     pyramidCommand,
+    epyramidCommand,
+    hpyramidCommand,
+    ehpyramidCommand,
     replaceNearCommand,
+    ereplaceNearCommand,
     removeNearCommand,
     drainCommand,
     undoCommand,
@@ -89,7 +108,11 @@ const COMMANDS = [
     ceilCommand,
     thruCommand,
     jumpToCommand,
-    menuCommand
+    menuCommand,
+    debugCommand,
+    brushCommand,
+    ebrushCommand,
+    generateCommand
 ];
 
 /**
@@ -100,6 +123,7 @@ const COMMANDS = [
 function registerCommands(registry) {
     registry.registerEnum("we:direction", Object.keys(DIRECTIONS));
     registry.registerEnum("we:axis", ["x", "z"]);
+    registry.registerEnum("we:brushshape", ["sphere", "cylinder", "hsphere", "hcylinder", "none"]);
     for (const command of COMMANDS) {
         registry.registerCommand(command.definition, command.handler);
     }

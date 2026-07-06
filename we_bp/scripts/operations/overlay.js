@@ -1,11 +1,12 @@
-import { world, system, BlockPermutation, Dimension, Player } from "@minecraft/server";
+import { world, system, Dimension, Player } from "@minecraft/server";
 import { pushUndo, setBusy } from "../session.js";
 import { WE_CONFIG } from "../config.js";
-import { AIR_ID, chunkFloor } from "./util.js";
+import { AIR_ID, chunkFloor, pickPatternPermutation } from "./util.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan } from "./ticking.js";
 
 /**
  * @typedef {{x: number, y: number, z: number}} Vec3
+ * @typedef {{entries: {permutation: object, weight: number}[], total: number, label: string}} FillPattern
  */
 
 /**
@@ -15,12 +16,12 @@ import { tickAreaFor, releaseTickArea, pickAreaSpan } from "./ticking.js";
  * @param {Dimension} dimension The dimension to edit.
  * @param {Vec3} min The inclusive box min corner.
  * @param {Vec3} max The inclusive box max corner.
- * @param {BlockPermutation} permutation The permutation to place.
+ * @param {FillPattern} pattern The fill pattern to place from.
  * @returns {void}
  */
-function runOverlay(player, dimension, min, max, permutation) {
+function runOverlay(player, dimension, min, max, pattern) {
     setBusy(player.name, true);
-    system.runJob(overlayJob(dimension, min, max, permutation, player.name));
+    system.runJob(overlayJob(dimension, min, max, pattern, player.name));
 }
 
 /**
@@ -29,11 +30,11 @@ function runOverlay(player, dimension, min, max, permutation) {
  * @param {Dimension} dimension The dimension to edit.
  * @param {Vec3} min The inclusive box min corner.
  * @param {Vec3} max The inclusive box max corner.
- * @param {BlockPermutation} permutation The permutation to place.
+ * @param {FillPattern} pattern The fill pattern to place from.
  * @param {string} playerName The editing player's name.
  * @returns {Generator} The overlay job generator.
  */
-function* overlayJob(dimension, min, max, permutation, playerName) {
+function* overlayJob(dimension, min, max, pattern, playerName) {
     const changes = [];
     let processed = 0;
     const span = pickAreaSpan();
@@ -59,8 +60,9 @@ function* overlayJob(dimension, min, max, permutation, playerName) {
                         const above = dimension.getBlock({ x, y: y + 1, z });
                         if (above && above.typeId === AIR_ID) {
                             const before = above.permutation;
-                            dimension.setBlockPermutation({ x, y: y + 1, z }, permutation);
-                            changes.push({ location: { x, y: y + 1, z }, before, after: permutation });
+                            const placed = pickPatternPermutation(pattern);
+                            dimension.setBlockPermutation({ x, y: y + 1, z }, placed);
+                            changes.push({ location: { x, y: y + 1, z }, before, after: placed });
                         }
                         break;
                     }

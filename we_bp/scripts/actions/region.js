@@ -1,4 +1,4 @@
-import { system, BlockPermutation, Player } from "@minecraft/server";
+import { system, Player } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { runBoxEdit } from "../operations/box.js";
 import { runShapeEdit } from "../operations/shape.js";
@@ -6,76 +6,102 @@ import { runCount } from "../operations/count.js";
 import { runOverlay } from "../operations/overlay.js";
 import { moveSelection } from "../operations/move.js";
 import { hollowCubeRuns, wallsRuns } from "../shapes/cube.js";
-import { AIR_ID, resolveBlockId, directionOrView, requireRegion, shortName } from "./common.js";
+import { AIR_ID, resolveBlockId, parsePattern, patternErrorMessage, directionOrView, requireRegion, shortName } from "./common.js";
 
 /**
  * @typedef {{ok: boolean, message: string}} ActionResult
+ * @typedef {{entries: {permutation: object, weight: number}[], total: number, label: string}} FillPattern
  */
 
 /**
- * Fills the selection with a block.
+ * Returns a failure when a weighted pattern targets more cells than the
+ * per-cell fill cap allows, or null.
+ * @param {FillPattern} pattern The parsed fill pattern.
+ * @param {number} volume The number of cells the edit covers.
+ * @returns {ActionResult|null} The failure, or null when allowed.
+ */
+function patternCapGuard(pattern, volume) {
+    if (pattern.entries.length > 1 && volume > WE_CONFIG.maxPatternBlocks) {
+        return { ok: false, message: "§cWeighted patterns cap at " + WE_CONFIG.maxPatternBlocks + " blocks." };
+    }
+    return null;
+}
+
+/**
+ * Fills the selection with a block or weighted pattern.
  * @param {Player} player The acting player.
- * @param {string} blockId The block id to fill with.
+ * @param {string} blockText The block id or pattern to fill with.
  * @param {boolean} includeAir When true, air cells are filled too.
  * @param {string} label The history label.
  * @returns {ActionResult} The result.
  */
-function setBlocks(player, blockId, includeAir, label) {
+function setBlocks(player, blockText, includeAir, label) {
     const region = requireRegion(player);
     if (!region.ok) {
         return region;
     }
-    const full = resolveBlockId(blockId);
-    if (!full) {
-        return { ok: false, message: "§cUnknown block: " + blockId };
+    const pattern = parsePattern(blockText);
+    if (!pattern) {
+        return { ok: false, message: patternErrorMessage(blockText) };
     }
-    runBoxEdit(player, player.dimension, region.min, region.max, BlockPermutation.resolve(full), null, Boolean(includeAir), label + " " + shortName(full));
+    const capped = patternCapGuard(pattern, region.volume);
+    if (capped) {
+        return capped;
+    }
+    runBoxEdit(player, player.dimension, region.min, region.max, pattern, null, Boolean(includeAir), label + " §b" + pattern.label);
     return { ok: true, message: "§a" + label + " started..." };
 }
 
 /**
- * Replaces one block type with another inside the selection.
+ * Replaces one block type with another block or weighted pattern inside the
+ * selection.
  * @param {Player} player The acting player.
  * @param {string} fromId The block id to replace.
- * @param {string} toId The block id to place.
+ * @param {string} toText The block id or pattern to place.
  * @returns {ActionResult} The result.
  */
-function replaceBlocks(player, fromId, toId) {
+function replaceBlocks(player, fromId, toText) {
     const region = requireRegion(player);
     if (!region.ok) {
         return region;
     }
     const from = resolveBlockId(fromId);
-    const to = resolveBlockId(toId);
-    if (!from || !to) {
-        return { ok: false, message: "§cUnknown block: " + (from ? toId : fromId) };
+    if (!from) {
+        return { ok: false, message: "§cUnknown block: " + fromId };
     }
-    runBoxEdit(player, player.dimension, region.min, region.max, BlockPermutation.resolve(to), from, true, "Replace " + shortName(from) + " -> " + shortName(to));
+    const pattern = parsePattern(toText);
+    if (!pattern) {
+        return { ok: false, message: patternErrorMessage(toText) };
+    }
+    const capped = patternCapGuard(pattern, region.volume);
+    if (capped) {
+        return capped;
+    }
+    runBoxEdit(player, player.dimension, region.min, region.max, pattern, from, true, "Replace §b" + shortName(from) + "§7 -> §b" + pattern.label);
     return { ok: true, message: "§aReplace started..." };
 }
 
 /**
  * Draws a run-based shell over the selection box.
  * @param {Player} player The acting player.
- * @param {string} blockId The block id to build with.
+ * @param {string} blockText The block id or pattern to build with.
  * @param {boolean} includeAir When true, air cells are filled too.
  * @param {string} kind Either "faces" (all six) or "walls" (sides only).
  * @returns {ActionResult} The result.
  */
-function buildSelectionShell(player, blockId, includeAir, kind) {
+function buildSelectionShell(player, blockText, includeAir, kind) {
     const region = requireRegion(player);
     if (!region.ok) {
         return region;
     }
-    const full = resolveBlockId(blockId);
-    if (!full) {
-        return { ok: false, message: "§cUnknown block: " + blockId };
+    const pattern = parsePattern(blockText);
+    if (!pattern) {
+        return { ok: false, message: patternErrorMessage(blockText) };
     }
-    const perm = BlockPermutation.resolve(full);
     const runs = kind === "walls" ? wallsRuns(region.min, region.max) : hollowCubeRuns(region.min, region.max);
-    const label = (kind === "walls" ? "Walls " : "Faces ") + shortName(full);
-    runShapeEdit(player, player.dimension, runs, region.min, region.max, perm, Boolean(includeAir), label, null);
-    return { ok: true, message: "§a" + label + " started..." };
+    const label = (kind === "walls" ? "Walls " : "Faces ") + "§b" + pattern.label;
+    runShapeEdit(player, player.dimension, runs, region.min, region.max, pattern, Boolean(includeAir), label, null);
+    return { ok: true, message: "§a" + label + "§a started..." };
 }
 
 /**
@@ -93,26 +119,27 @@ function hollowSelection(player) {
     if (min.x > max.x || min.y > max.y || min.z > max.z) {
         return { ok: false, message: "§cSelection too thin to hollow." };
     }
-    runBoxEdit(player, player.dimension, min, max, BlockPermutation.resolve(AIR_ID), null, true, "Hollow");
+    runBoxEdit(player, player.dimension, min, max, parsePattern(AIR_ID), null, true, "Hollow");
     return { ok: true, message: "§aHollow started..." };
 }
 
 /**
- * Places a block on top of every column's highest non-air block in the selection.
+ * Places a block or weighted pattern on top of every column's highest non-air
+ * block in the selection.
  * @param {Player} player The acting player.
- * @param {string} blockId The block id to overlay.
+ * @param {string} blockText The block id or pattern to overlay.
  * @returns {ActionResult} The result.
  */
-function overlaySelection(player, blockId) {
+function overlaySelection(player, blockText) {
     const region = requireRegion(player);
     if (!region.ok) {
         return region;
     }
-    const full = resolveBlockId(blockId);
-    if (!full) {
-        return { ok: false, message: "§cUnknown block: " + blockId };
+    const pattern = parsePattern(blockText);
+    if (!pattern) {
+        return { ok: false, message: patternErrorMessage(blockText) };
     }
-    runOverlay(player, player.dimension, region.min, region.max, BlockPermutation.resolve(full));
+    runOverlay(player, player.dimension, region.min, region.max, pattern);
     return { ok: true, message: "§aOverlay started..." };
 }
 
