@@ -1,7 +1,9 @@
 import { world, system, Dimension, Player } from "@minecraft/server";
-import { pushUndo, setBusy } from "../session.js";
+import { pushUndo, discardUndo, setBusy } from "../session.js";
 import { chunkFloor, clampToHeight, pickPatternPermutation } from "./util.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan, areaFullyLoaded } from "./ticking.js";
+import { runTrackedJob } from "./jobs.js";
+import { fallingBlockSweeper } from "./protect.js";
 import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
 
 const GEN_CELLS_PER_YIELD = 256;
@@ -31,7 +33,7 @@ function runGenerate(player, dimension, min, max, evaluate, pattern, label) {
     if (useBusy) {
         setBusy(player.name, true);
     }
-    system.runJob(generateJob(dimension, box.min, box.max, evaluate, pattern, player.name, label, useBusy));
+    runTrackedJob(player.name, generateJob(dimension, box.min, box.max, evaluate, pattern, player.name, label, useBusy));
 }
 
 /**
@@ -56,6 +58,9 @@ function* generateJob(dimension, min, max, evaluate, pattern, playerName, label,
     const hy = (max.y - min.y) / 2 || 1;
     const hz = (max.z - min.z) / 2 || 1;
     const changes = [];
+    const record = { dimensionId: dimension.id, changes, label, blocks: 0, tick: system.currentTick };
+    pushUndo(playerName, record);
+    const sweep = fallingBlockSweeper(dimension, min, max);
     let sinceYield = 0;
     const span = pickAreaSpan();
     for (let ax = chunkFloor(min.x); ax <= max.x; ax += span) {
@@ -73,6 +78,7 @@ function* generateJob(dimension, min, max, evaluate, pattern, playerName, label,
                         if (sinceYield >= GEN_CELLS_PER_YIELD) {
                             sinceYield = 0;
                             debugProgress(playerName, changes.length);
+                            sweep(false);
                             yield;
                         }
                         const value = evaluate((x - cx) / hx, (y - cy) / hy, (z - cz) / hz);
@@ -91,11 +97,14 @@ function* generateJob(dimension, min, max, evaluate, pattern, playerName, label,
                     }
                 }
             }
+            sweep(false);
         }
     }
+    sweep(true);
     releaseTickArea(playerName);
-    if (changes.length > 0) {
-        pushUndo(playerName, { dimensionId: dimension.id, changes, label, blocks: changes.length, tick: system.currentTick });
+    record.blocks = changes.length;
+    if (changes.length === 0) {
+        discardUndo(playerName, record);
     }
     debugEnd(playerName);
     const acting = world.getAllPlayers().find((p) => p.name === playerName);

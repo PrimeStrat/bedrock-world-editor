@@ -162,6 +162,21 @@ function pushUndo(playerName, record) {
 }
 
 /**
+ * Removes a specific record from a player's undo stack, used when a job
+ * finishes with nothing to undo.
+ * @param {string} playerName The player's name.
+ * @param {EditRecord} record The record to remove.
+ * @returns {void}
+ */
+function discardUndo(playerName, record) {
+    const session = getSession(playerName);
+    const index = session.undo.lastIndexOf(record);
+    if (index !== -1) {
+        session.undo.splice(index, 1);
+    }
+}
+
+/**
  * Pops the most recent edit from a player's undo stack, moving it to redo.
  * @param {string} playerName The player's name.
  * @returns {EditRecord|null} The edit to reverse, or null when empty.
@@ -210,4 +225,4 @@ function getHistory(playerName) {
     };
 }
 
-export { getSession, setPos1, setPos2, getSelection, clearSelection, clearHistory, pushUndo, popUndo, popRedo, getHistory, isBusy, setBusy };
+export { getSession, setPos1, setPos2, getSelection, clearSelection, clearHistory, pushUndo, discardUndo, popUndo, popRedo, getHistory, isBusy, setBusy };

@@ -240,11 +240,12 @@ function pasteClipboard(player, skipAir) {
     const mirror = mirrorFor(clip.flipX, clip.flipZ);
     const dimension = player.dimension;
 
-    const placeFn = () => {
+    const placeFn = function* () {
         for (const tile of clip.tiles) {
             const o = transformedTileOrigin(tile, clip.size, quarters, clip.flipX, clip.flipZ);
             const location = { x: targetMin.x + o.x, y: targetMin.y + tile.oy, z: targetMin.z + o.z };
             world.structureManager.place(tile.structureId, dimension, location, { rotation, mirror, includeEntities: false });
+            yield;
         }
     };
 
@@ -312,11 +313,12 @@ function stackSelection(player, pos1, pos2, count, dir) {
     const regionMin = { x: Math.min(minX, farMin.x), y: Math.min(minY, farMin.y), z: Math.min(minZ, farMin.z) };
     const regionMax = { x: Math.max(maxX, farMin.x + size.x - 1), y: Math.max(maxY, farMin.y + size.y - 1), z: Math.max(maxZ, farMin.z + size.z - 1) };
 
-    const placeFn = () => {
+    const placeFn = function* () {
         for (let i = 1; i <= count; i++) {
             for (const tile of tiles) {
                 const location = { x: tile.tx + step.x * i, y: minY + step.y * i, z: tile.tz + step.z * i };
                 world.structureManager.place(tile.structureId, dimension, location, { includeEntities: false });
+                yield;
             }
         }
         for (const tile of tiles) {

@@ -1,6 +1,7 @@
 import { world, system, Dimension, Player } from "@minecraft/server";
-import { pushUndo } from "../session.js";
+import { pushUndo, discardUndo } from "../session.js";
 import { AIR_ID, pickPatternPermutation } from "./util.js";
+import { runTrackedJob } from "./jobs.js";
 
 const BRUSH_CELLS_PER_YIELD = 512;
 
@@ -23,7 +24,7 @@ const BRUSH_CELLS_PER_YIELD = 512;
  * @returns {void}
  */
 function runBrushFill(player, dimension, runs, pattern, includeAir, label) {
-    system.runJob(brushFillJob(dimension, Array.from(runs), pattern, includeAir, player.name, label));
+    runTrackedJob(player.name, brushFillJob(dimension, Array.from(runs), pattern, includeAir, player.name, label));
 }
 
 /**
@@ -41,6 +42,8 @@ function runBrushFill(player, dimension, runs, pattern, includeAir, label) {
 function* brushFillJob(dimension, runs, pattern, includeAir, playerName, label) {
     const range = dimension.heightRange;
     const changes = [];
+    const record = { dimensionId: dimension.id, changes, label, blocks: 0, tick: system.currentTick };
+    pushUndo(playerName, record);
     let processed = 0;
     for (const run of runs) {
         if (run.y < range.min || run.y > range.max - 1) {
@@ -62,8 +65,9 @@ function* brushFillJob(dimension, runs, pattern, includeAir, playerName, label) 
             changes.push({ location: loc, before, after: placed });
         }
     }
-    if (changes.length > 0) {
-        pushUndo(playerName, { dimensionId: dimension.id, changes, label, blocks: changes.length, tick: system.currentTick });
+    record.blocks = changes.length;
+    if (changes.length === 0) {
+        discardUndo(playerName, record);
     }
     const player = world.getAllPlayers().find((p) => p.name === playerName);
     if (player) {

@@ -16,7 +16,8 @@ import { tickAreaFor, releaseTickArea } from "./ticking.js";
  * @param {Dimension} dimension The dimension to edit.
  * @param {Vec3} min The inclusive min corner of the affected box.
  * @param {Vec3} max The inclusive max corner of the affected box.
- * @param {function():void} placeFn Places the structures into the box.
+ * @param {function():Generator} placeFn Generator that places the structures
+ *   into the box, yielding between placements.
  * @param {string} label A short label for history and the completion message.
  * @param {boolean} skipAir When true, cells the paste left as air are reverted
  *   to the original block instead of overwriting it.
@@ -34,7 +35,7 @@ function pasteRegion(player, dimension, min, max, placeFn, label, skipAir) {
  * @param {Dimension} dimension The dimension to edit.
  * @param {Vec3} min The inclusive min corner.
  * @param {Vec3} max The inclusive max corner.
- * @param {function():void} placeFn Places the structures into the box.
+ * @param {function():Generator} placeFn Generator that places the structures.
  * @param {string} playerName The pasting player's name.
  * @param {string} label A short label for the completion message.
  * @param {boolean} skipAir When true, cells left as air are reverted.
@@ -58,8 +59,7 @@ function* pasteJob(dimension, min, max, placeFn, playerName, label, skipAir) {
             }
         }
     }
-    placeFn();
-    yield;
+    yield* placeFn();
     const changes = [];
     for (const [key, beforePerm] of before.entries()) {
         const [x, y, z] = key.split(",").map(Number);

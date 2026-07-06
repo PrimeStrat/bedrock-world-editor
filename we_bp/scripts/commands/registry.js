@@ -47,6 +47,7 @@ import { menuCommand } from "./menu.js";
 import { debugCommand } from "./debug.js";
 import { brushCommand, ebrushCommand } from "./brush.js";
 import { generateCommand } from "./generate.js";
+import { cancelCommand } from "./cancel.js";
 
 const COMMANDS = [
     pos1Command,
@@ -112,7 +113,8 @@ const COMMANDS = [
     debugCommand,
     brushCommand,
     ebrushCommand,
-    generateCommand
+    generateCommand,
+    cancelCommand
 ];
 
 /**

@@ -4,6 +4,8 @@ import { WE_CONFIG } from "../config.js";
 import { CHUNK, chunkFloor, blockFilterFor, clampToHeight, pickPatternPermutation, cellMatchesFilter } from "./util.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan, areaFullyLoaded } from "./ticking.js";
 import { reserveBoxUndoSlot, snapshotBoxTiles } from "./undo.js";
+import { runTrackedJob } from "./jobs.js";
+import { fallingBlockSweeper } from "./protect.js";
 import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
 
 const CELLS_PER_YIELD = 256;
@@ -33,7 +35,7 @@ function runBoxEdit(player, dimension, min, max, pattern, matchId, includeAir, l
     if (useBusy) {
         setBusy(player.name, true);
     }
-    system.runJob(boxEditJob(dimension, box.min, box.max, pattern, matchId, includeAir, player.name, label, useBusy));
+    runTrackedJob(player.name, boxEditJob(dimension, box.min, box.max, pattern, matchId, includeAir, player.name, label, useBusy));
 }
 
 /**
@@ -57,6 +59,7 @@ function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outC
     const blockFilter = blockFilterFor(matchId, includeAir);
     const single = pattern.entries.length === 1 && !matchId;
     const filtered = Boolean(matchId) || !includeAir;
+    const sweep = fallingBlockSweeper(dimension, min, max);
     let changed = 0;
     const span = pickAreaSpan();
     for (let ax = chunkFloor(min.x); ax <= max.x; ax += span) {
@@ -80,6 +83,7 @@ function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outC
                             const result = dimension.fillBlocks(new BlockVolume(subMin, subMax), pattern.entries[0].permutation, { blockFilter });
                             changed += result.getCapacity();
                             debugProgress(playerName, changed);
+                            sweep(false);
                             yield;
                         }
                     }
@@ -103,14 +107,17 @@ function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outC
                             if (sinceYield >= CELLS_PER_YIELD) {
                                 sinceYield = 0;
                                 debugProgress(playerName, changed);
+                                sweep(false);
                                 yield;
                             }
                         }
                     }
                 }
             }
+            sweep(false);
         }
     }
+    sweep(true);
     outChanged[0] = changed;
 }
 
@@ -133,10 +140,7 @@ function* boxEditJob(dimension, min, max, pattern, matchId, includeAir, playerNa
     const slot = reserveBoxUndoSlot(playerName);
     const tiles = [];
     yield* snapshotBoxTiles(dimension, min, max, playerName, slot, tiles);
-    const outChanged = [0];
-    yield* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outChanged, playerName);
-    releaseTickArea(playerName);
-    pushUndo(playerName, {
+    const record = {
         kind: "box",
         dimensionId: dimension.id,
         tiles,
@@ -144,9 +148,14 @@ function* boxEditJob(dimension, min, max, pattern, matchId, includeAir, playerNa
         max: { x: max.x, y: max.y, z: max.z },
         fill: { pattern, matchId, includeAir },
         label,
-        blocks: outChanged[0],
+        blocks: 0,
         tick: system.currentTick
-    });
+    };
+    pushUndo(playerName, record);
+    const outChanged = [0];
+    yield* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outChanged, playerName);
+    releaseTickArea(playerName);
+    record.blocks = outChanged[0];
     debugEnd(playerName);
     const acting = world.getAllPlayers().find((p) => p.name === playerName);
     if (acting) {

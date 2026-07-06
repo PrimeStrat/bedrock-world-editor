@@ -1,4 +1,4 @@
-import { world, StructureSaveMode, Dimension } from "@minecraft/server";
+import { world, system, StructureSaveMode, Dimension } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { TILE, TILE_HEIGHT } from "./util.js";
 import { tickAreaFor } from "./ticking.js";
@@ -142,23 +142,31 @@ function* snapshotRunTiles(dimension, runs, bboxMin, bboxMax, playerName, slot, 
 
 /**
  * Deletes every world edit structure saved to the world and removes this pack's
- * ticking areas. Undo/clipboard structures are session-scoped, so any that
- * survive into a new world load are stale and safe to remove. Call once on
- * world load.
- * @returns {number} The number of structures deleted.
+ * ticking areas, spread across ticks so a large backlog cannot hang the
+ * watchdog on world load. Undo/clipboard structures are session-scoped, so any
+ * that survive into a new world load are stale and safe to remove. Call once
+ * on world load.
+ * @returns {void}
  */
 function clearWorldEditStructures() {
-    let count = 0;
+    system.runJob(clearStructuresJob());
+}
+
+/**
+ * Generator backing clearWorldEditStructures: deletes stale structures one
+ * per resume, then clears the ticking areas and slot bookkeeping.
+ * @returns {Generator} The cleanup job generator.
+ */
+function* clearStructuresJob() {
     for (const id of world.structureManager.getWorldStructureIds()) {
         if (id.startsWith("we:")) {
             world.structureManager.delete(id);
-            count += 1;
+            yield;
         }
     }
     world.tickingAreaManager.removeAllTickingAreas();
     boxUndoCounters.clear();
     boxUndoSlotTiles.clear();
-    return count;
 }
 
 export { reserveBoxUndoSlot, snapshotBoxTiles, snapshotRunTiles, clearWorldEditStructures };

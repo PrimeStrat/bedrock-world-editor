@@ -3,6 +3,8 @@ import { pushUndo, setBusy } from "../session.js";
 import { chunkFloor, blockFilterFor, clampToHeight, pickPatternPermutation, cellMatchesFilter } from "./util.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan, areaFullyLoaded } from "./ticking.js";
 import { reserveBoxUndoSlot, snapshotRunTiles } from "./undo.js";
+import { runTrackedJob } from "./jobs.js";
+import { fallingBlockSweeper } from "./protect.js";
 import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
 
 const RUNS_PER_YIELD = 256;
@@ -26,15 +28,17 @@ const RUNS_PER_YIELD = 256;
  * @param {boolean} includeAir When false, cells currently air are not filled.
  * @param {string} label A short label for history and the completion message.
  * @param {string|string[]|null} matchId Only fill cells of this block id (replace), or null for any.
+ * @param {boolean} nativeMatch When true, matching uses the native fillBlocks
+ *   filter (fast; safe for ids with no family overlap, like liquids).
  * @returns {void}
  */
-function runShapeEdit(player, dimension, runs, bboxMin, bboxMax, pattern, includeAir, label, matchId) {
+function runShapeEdit(player, dimension, runs, bboxMin, bboxMax, pattern, includeAir, label, matchId, nativeMatch) {
     const box = clampToHeight(dimension, bboxMin, bboxMax);
     const useBusy = !areaFullyLoaded(dimension, box.min, box.max);
     if (useBusy) {
         setBusy(player.name, true);
     }
-    system.runJob(shapeEditJob(dimension, Array.from(runs), box.min, box.max, pattern, includeAir, matchId ?? null, player.name, label, useBusy));
+    runTrackedJob(player.name, shapeEditJob(dimension, Array.from(runs), box.min, box.max, pattern, includeAir, matchId ?? null, Boolean(nativeMatch), player.name, label, useBusy));
 }
 
 /**
@@ -50,15 +54,17 @@ function runShapeEdit(player, dimension, runs, bboxMin, bboxMax, pattern, includ
  * @param {Vec3} bboxMax The inclusive bounding box max corner.
  * @param {FillPattern} pattern The fill pattern.
  * @param {string|string[]|null} matchId Only fill cells of this block id, or null for any.
+ * @param {boolean} nativeMatch When true, matching uses the native filter.
  * @param {boolean} includeAir When false, cells currently air are not filled.
  * @param {number[]} outChanged A one-element array receiving the changed count.
  * @param {string} playerName The acting player's name.
  * @returns {Generator} The chunked run fill generator.
  */
-function* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, includeAir, outChanged, playerName) {
+function* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, nativeMatch, includeAir, outChanged, playerName) {
     const blockFilter = blockFilterFor(matchId, includeAir);
-    const single = pattern.entries.length === 1 && !matchId;
+    const single = pattern.entries.length === 1 && (!matchId || nativeMatch);
     const filtered = Boolean(matchId) || !includeAir;
+    const sweep = fallingBlockSweeper(dimension, bboxMin, bboxMax);
     let blocks = 0;
     const span = pickAreaSpan();
     for (let ax = chunkFloor(bboxMin.x); ax <= bboxMax.x; ax += span) {
@@ -98,6 +104,7 @@ function* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, i
                         sinceYield += 1;
                         if (sinceYield >= RUNS_PER_YIELD) {
                             sinceYield = 0;
+                            sweep(false);
                             yield;
                         }
                     }
@@ -105,11 +112,14 @@ function* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, i
                 if (sinceYield >= RUNS_PER_YIELD) {
                     sinceYield = 0;
                     debugProgress(playerName, blocks);
+                    sweep(false);
                     yield;
                 }
             }
+            sweep(false);
         }
     }
+    sweep(true);
     outChanged[0] = blocks;
     debugProgress(playerName, blocks);
 }
@@ -129,26 +139,28 @@ function* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, i
  * @param {boolean} useBusy Whether this job holds the busy flag.
  * @returns {Generator} The shape edit job generator.
  */
-function* shapeEditJob(dimension, runs, bboxMin, bboxMax, pattern, includeAir, matchId, playerName, label, useBusy) {
+function* shapeEditJob(dimension, runs, bboxMin, bboxMax, pattern, includeAir, matchId, nativeMatch, playerName, label, useBusy) {
     debugStart(playerName, label);
     const slot = reserveBoxUndoSlot(playerName);
     const tiles = [];
     yield* snapshotRunTiles(dimension, runs, bboxMin, bboxMax, playerName, slot, tiles);
-    const outChanged = [0];
-    yield* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, includeAir, outChanged, playerName);
-    releaseTickArea(playerName);
-    pushUndo(playerName, {
+    const record = {
         kind: "shape",
         dimensionId: dimension.id,
         tiles,
         runs,
         min: { x: bboxMin.x, y: bboxMin.y, z: bboxMin.z },
         max: { x: bboxMax.x, y: bboxMax.y, z: bboxMax.z },
-        fill: { pattern, includeAir, matchId },
+        fill: { pattern, includeAir, matchId, nativeMatch },
         label,
-        blocks: outChanged[0],
+        blocks: 0,
         tick: system.currentTick
-    });
+    };
+    pushUndo(playerName, record);
+    const outChanged = [0];
+    yield* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, nativeMatch, includeAir, outChanged, playerName);
+    releaseTickArea(playerName);
+    record.blocks = outChanged[0];
     debugEnd(playerName);
     const acting = world.getAllPlayers().find((p) => p.name === playerName);
     if (acting) {
@@ -174,7 +186,7 @@ function* shapeEditJob(dimension, runs, bboxMin, bboxMax, pattern, includeAir, m
 function* refillShapeJob(dimension, record, playerName) {
     debugStart(playerName, "Redo " + record.label);
     const outChanged = [0];
-    yield* fillRunsChunked(dimension, record.runs, record.min, record.max, record.fill.pattern, record.fill.matchId, record.fill.includeAir, outChanged, playerName);
+    yield* fillRunsChunked(dimension, record.runs, record.min, record.max, record.fill.pattern, record.fill.matchId, Boolean(record.fill.nativeMatch), record.fill.includeAir, outChanged, playerName);
     releaseTickArea(playerName);
     debugEnd(playerName);
     const player = world.getAllPlayers().find((p) => p.name === playerName);

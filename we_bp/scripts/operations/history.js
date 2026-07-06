@@ -4,6 +4,7 @@ import { WE_CONFIG } from "../config.js";
 import { tickAreaFor, releaseTickArea } from "./ticking.js";
 import { refillBoxJob } from "./box.js";
 import { refillShapeJob } from "./shape.js";
+import { runTrackedJob } from "./jobs.js";
 import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
 
 /**
@@ -21,10 +22,10 @@ function applyUndo(player, record) {
     const dimension = world.getDimension(record.dimensionId);
     setBusy(player.name, true);
     if (record.kind === "box" || record.kind === "shape") {
-        system.runJob(placeTilesJob(dimension, record.tiles, player.name, record.blocks));
+        runTrackedJob(player.name, placeTilesJob(dimension, record.tiles, player.name, record.blocks));
         return;
     }
-    system.runJob(restoreJob(dimension, record.changes, "before", player.name, "Undo"));
+    runTrackedJob(player.name, restoreJob(dimension, record.changes, "before", player.name, "Undo"));
 }
 
 /**
@@ -38,14 +39,14 @@ function applyRedo(player, record) {
     const dimension = world.getDimension(record.dimensionId);
     setBusy(player.name, true);
     if (record.kind === "box") {
-        system.runJob(refillBoxJob(dimension, record, player.name));
+        runTrackedJob(player.name, refillBoxJob(dimension, record, player.name));
         return;
     }
     if (record.kind === "shape") {
-        system.runJob(refillShapeJob(dimension, record, player.name));
+        runTrackedJob(player.name, refillShapeJob(dimension, record, player.name));
         return;
     }
-    system.runJob(restoreJob(dimension, record.changes, "after", player.name, "Redo"));
+    runTrackedJob(player.name, restoreJob(dimension, record.changes, "after", player.name, "Redo"));
 }
 
 /**

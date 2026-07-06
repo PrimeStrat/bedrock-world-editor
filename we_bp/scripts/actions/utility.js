@@ -58,7 +58,8 @@ function drainNear(player, radius) {
     const c = blockUnder(player);
     const bboxMin = { x: c.x - r, y: c.y - r, z: c.z - r };
     const bboxMax = { x: c.x + r, y: c.y + r, z: c.z + r };
-    runShapeEdit(player, player.dimension, sphereRuns(c, r, false), bboxMin, bboxMax, parsePattern(AIR_ID), true, "Drain", LIQUID_IDS);
+    const runs = Array.from(sphereRuns(c, r, false)).sort((a, b) => b.y - a.y);
+    runShapeEdit(player, player.dimension, runs, bboxMin, bboxMax, parsePattern(AIR_ID), true, "Drain", LIQUID_IDS, true);
     return { ok: true, message: "§aDraining..." };
 }
 

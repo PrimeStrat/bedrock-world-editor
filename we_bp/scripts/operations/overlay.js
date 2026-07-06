@@ -1,8 +1,9 @@
 import { world, system, Dimension, Player } from "@minecraft/server";
-import { pushUndo, setBusy } from "../session.js";
+import { pushUndo, discardUndo, setBusy } from "../session.js";
 import { WE_CONFIG } from "../config.js";
 import { AIR_ID, chunkFloor, pickPatternPermutation } from "./util.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan } from "./ticking.js";
+import { runTrackedJob } from "./jobs.js";
 
 /**
  * @typedef {{x: number, y: number, z: number}} Vec3
@@ -21,7 +22,7 @@ import { tickAreaFor, releaseTickArea, pickAreaSpan } from "./ticking.js";
  */
 function runOverlay(player, dimension, min, max, pattern) {
     setBusy(player.name, true);
-    system.runJob(overlayJob(dimension, min, max, pattern, player.name));
+    runTrackedJob(player.name, overlayJob(dimension, min, max, pattern, player.name));
 }
 
 /**
@@ -36,6 +37,8 @@ function runOverlay(player, dimension, min, max, pattern) {
  */
 function* overlayJob(dimension, min, max, pattern, playerName) {
     const changes = [];
+    const record = { dimensionId: dimension.id, changes, label: "Overlay §b" + pattern.label, blocks: 0, tick: system.currentTick };
+    pushUndo(playerName, record);
     let processed = 0;
     const span = pickAreaSpan();
     for (let ax = chunkFloor(min.x); ax <= max.x; ax += span) {
@@ -71,8 +74,9 @@ function* overlayJob(dimension, min, max, pattern, playerName) {
         }
     }
     releaseTickArea(playerName);
-    if (changes.length > 0) {
-        pushUndo(playerName, { dimensionId: dimension.id, changes, label: "Overlay", blocks: changes.length, tick: system.currentTick });
+    record.blocks = changes.length;
+    if (changes.length === 0) {
+        discardUndo(playerName, record);
     }
     const player = world.getAllPlayers().find((p) => p.name === playerName);
     if (player) {

@@ -1,4 +1,5 @@
 import { world, BlockPermutation, BlockVolume, StructureSaveMode, Dimension, Player } from "@minecraft/server";
+import { WE_CONFIG } from "../config.js";
 import { AIR_ID, TILE, CHUNK, chunkFloor } from "./util.js";
 import { pasteRegion } from "./paste.js";
 
@@ -7,23 +8,26 @@ import { pasteRegion } from "./paste.js";
  */
 
 /**
- * Fills a box with air synchronously in chunk-column slabs, each within the
- * native fillBlocks cap.
+ * Generator that fills a box with air in chunk-column slabs, each within the
+ * native fillBlocks cap, yielding between slabs.
  * @param {Dimension} dimension The dimension to edit.
  * @param {Vec3} min The inclusive box min corner.
  * @param {Vec3} max The inclusive box max corner.
- * @returns {void}
+ * @returns {Generator} The air fill generator.
  */
-function fillAirSync(dimension, min, max) {
+function* fillAirJob(dimension, min, max) {
     const air = BlockPermutation.resolve(AIR_ID);
     for (let x = min.x; x <= max.x; x = chunkFloor(x) + CHUNK) {
         for (let z = min.z; z <= max.z; z = chunkFloor(z) + CHUNK) {
-            const subMax = {
-                x: Math.min(chunkFloor(x) + CHUNK - 1, max.x),
-                y: max.y,
-                z: Math.min(chunkFloor(z) + CHUNK - 1, max.z)
-            };
-            dimension.fillBlocks(new BlockVolume({ x, y: min.y, z }, subMax), air);
+            for (let y = min.y; y <= max.y; y += WE_CONFIG.fillSlab) {
+                const subMax = {
+                    x: Math.min(chunkFloor(x) + CHUNK - 1, max.x),
+                    y: Math.min(y + WE_CONFIG.fillSlab - 1, max.y),
+                    z: Math.min(chunkFloor(z) + CHUNK - 1, max.z)
+                };
+                dimension.fillBlocks(new BlockVolume({ x, y, z }, subMax), air);
+                yield;
+            }
         }
     }
 }
@@ -65,11 +69,12 @@ function moveSelection(player, min, max, offset) {
     const regionMin = { x: Math.min(min.x, destMin.x), y: Math.min(min.y, destMin.y), z: Math.min(min.z, destMin.z) };
     const regionMax = { x: Math.max(max.x, destMax.x), y: Math.max(max.y, destMax.y), z: Math.max(max.z, destMax.z) };
 
-    const placeFn = () => {
-        fillAirSync(dimension, min, max);
+    const placeFn = function* () {
+        yield* fillAirJob(dimension, min, max);
         for (const tile of tiles) {
             const location = { x: tile.tx + offset.x, y: destMin.y, z: tile.tz + offset.z };
             world.structureManager.place(tile.structureId, dimension, location, { includeEntities: false });
+            yield;
         }
         for (const tile of tiles) {
             world.structureManager.delete(tile.structureId);
