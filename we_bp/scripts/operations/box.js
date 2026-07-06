@@ -1,7 +1,7 @@
 import { world, system, BlockVolume, Dimension, Player } from "@minecraft/server";
 import { pushUndo, setBusy } from "../session.js";
 import { WE_CONFIG } from "../config.js";
-import { CHUNK, chunkFloor, blockFilterFor, clampToHeight, pickPatternPermutation, cellMatchesFilter } from "./util.js";
+import { CHUNK, chunkFloor, boxVolume, blockFilterFor, clampToHeight, pickPatternPermutation, cellMatchesFilter } from "./util.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan, areaFullyLoaded } from "./ticking.js";
 import { reserveBoxUndoSlot, snapshotBoxTiles } from "./undo.js";
 import { runTrackedJob } from "./jobs.js";
@@ -144,6 +144,7 @@ function* boxEditJob(dimension, min, max, pattern, matchId, includeAir, playerNa
     const slot = reserveBoxUndoSlot(playerName);
     const tiles = [];
     yield* snapshotBoxTiles(dimension, min, max, playerName, slot, tiles);
+    const total = boxVolume(min, max);
     const record = {
         kind: "box",
         dimensionId: dimension.id,
@@ -152,18 +153,17 @@ function* boxEditJob(dimension, min, max, pattern, matchId, includeAir, playerNa
         max: { x: max.x, y: max.y, z: max.z },
         fill: { pattern, matchId, includeAir },
         label,
-        blocks: 0,
+        blocks: total,
         tick: system.currentTick
     };
     pushUndo(playerName, record);
     const outChanged = [0];
     yield* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outChanged, playerName);
     releaseTickArea(playerName);
-    record.blocks = outChanged[0];
     debugEnd(playerName);
     const acting = world.getAllPlayers().find((p) => p.name === playerName);
     if (acting) {
-        let message = "§a" + label + "§a: §f" + outChanged[0] + "§a block(s) changed.";
+        let message = "§a" + label + "§a: §f" + total + "§a block(s) set.";
         const skipped = debugSkipped(playerName);
         if (skipped > 0) {
             message += " §c" + skipped + " batch(es) skipped - run /we:debug.";
@@ -190,7 +190,7 @@ function* refillBoxJob(dimension, record, playerName) {
     debugEnd(playerName);
     const player = world.getAllPlayers().find((p) => p.name === playerName);
     if (player) {
-        player.sendMessage("§aRedo: §f" + outChanged[0] + "§a block(s) changed.");
+        player.sendMessage("§aRedo: §f" + boxVolume(record.min, record.max) + "§a block(s) redone.");
     }
     setBusy(playerName, false);
 }

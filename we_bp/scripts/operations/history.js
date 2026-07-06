@@ -102,7 +102,7 @@ function* placeTilesJob(dimension, tiles, playerName, blocks) {
     debugEnd(playerName);
     const player = world.getAllPlayers().find((p) => p.name === playerName);
     if (player) {
-        let message = "§aUndo: §f" + blocks + "§a block(s) restored.";
+        let message = "§aUndo: §f" + blocks + "§a block(s) undone.";
         const skipped = debugSkipped(playerName);
         if (skipped > 0) {
             message += " §c" + skipped + " tile(s) skipped - run /we:debug.";
@@ -157,7 +157,7 @@ function* restoreJob(dimension, changes, which, playerName, label) {
     releaseTickArea(playerName);
     const player = world.getAllPlayers().find((p) => p.name === playerName);
     if (player) {
-        player.sendMessage("§a" + label + ": §f" + changes.length + "§a block(s) restored.");
+        player.sendMessage("§a" + label + ": §f" + changes.length + "§a block(s) " + (label === "Undo" ? "undone." : "redone."));
     }
     setBusy(playerName, false);
 }

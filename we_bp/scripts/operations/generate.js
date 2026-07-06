@@ -1,6 +1,6 @@
 import { world, system, Dimension, Player } from "@minecraft/server";
 import { pushUndo, discardUndo, setBusy } from "../session.js";
-import { chunkFloor, clampToHeight, pickPatternPermutation } from "./util.js";
+import { chunkFloor, boxVolume, clampToHeight, pickPatternPermutation } from "./util.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan, areaFullyLoaded } from "./ticking.js";
 import { runTrackedJob } from "./jobs.js";
 import { fallingBlockSweeper } from "./protect.js";
@@ -57,8 +57,9 @@ function* generateJob(dimension, min, max, evaluate, pattern, playerName, label,
     const hx = (max.x - min.x) / 2 || 1;
     const hy = (max.y - min.y) / 2 || 1;
     const hz = (max.z - min.z) / 2 || 1;
+    const total = boxVolume(min, max);
     const changes = [];
-    const record = { dimensionId: dimension.id, changes, label, blocks: 0, tick: system.currentTick };
+    const record = { dimensionId: dimension.id, changes, label, blocks: total, tick: system.currentTick };
     pushUndo(playerName, record);
     const sweep = fallingBlockSweeper(dimension, min, max);
     let sinceYield = 0;
@@ -105,14 +106,13 @@ function* generateJob(dimension, min, max, evaluate, pattern, playerName, label,
     }
     sweep(true);
     releaseTickArea(playerName);
-    record.blocks = changes.length;
     if (changes.length === 0) {
         discardUndo(playerName, record);
     }
     debugEnd(playerName);
     const acting = world.getAllPlayers().find((p) => p.name === playerName);
     if (acting) {
-        let message = "§a" + label + "§a: §f" + changes.length + "§a block(s) placed.";
+        let message = "§a" + label + "§a: §f" + total + "§a block(s) set.";
         const skipped = debugSkipped(playerName);
         if (skipped > 0) {
             message += " §c" + skipped + " batch(es) skipped - run /we:debug.";

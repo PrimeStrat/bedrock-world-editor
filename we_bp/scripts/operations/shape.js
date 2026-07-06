@@ -148,6 +148,7 @@ function* shapeEditJob(dimension, runs, bboxMin, bboxMax, pattern, includeAir, m
     const slot = reserveBoxUndoSlot(playerName);
     const tiles = [];
     yield* snapshotRunTiles(dimension, runs, bboxMin, bboxMax, playerName, slot, tiles);
+    const total = runs.reduce((sum, run) => sum + run.length, 0);
     const record = {
         kind: "shape",
         dimensionId: dimension.id,
@@ -157,18 +158,17 @@ function* shapeEditJob(dimension, runs, bboxMin, bboxMax, pattern, includeAir, m
         max: { x: bboxMax.x, y: bboxMax.y, z: bboxMax.z },
         fill: { pattern, includeAir, matchId, nativeMatch },
         label,
-        blocks: 0,
+        blocks: total,
         tick: system.currentTick
     };
     pushUndo(playerName, record);
     const outChanged = [0];
     yield* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, nativeMatch, includeAir, outChanged, playerName);
     releaseTickArea(playerName);
-    record.blocks = outChanged[0];
     debugEnd(playerName);
     const acting = world.getAllPlayers().find((p) => p.name === playerName);
     if (acting) {
-        let message = "§a" + label + "§a: §f" + outChanged[0] + "§a block(s) changed.";
+        let message = "§a" + label + "§a: §f" + total + "§a block(s) set.";
         const skipped = debugSkipped(playerName);
         if (skipped > 0) {
             message += " §c" + skipped + " batch(es) skipped - run /we:debug.";
@@ -195,7 +195,7 @@ function* refillShapeJob(dimension, record, playerName) {
     debugEnd(playerName);
     const player = world.getAllPlayers().find((p) => p.name === playerName);
     if (player) {
-        player.sendMessage("§aRedo: §f" + record.blocks + "§a block(s) changed.");
+        player.sendMessage("§aRedo: §f" + record.blocks + "§a block(s) redone.");
     }
     setBusy(playerName, false);
 }

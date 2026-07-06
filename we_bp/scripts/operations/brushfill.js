@@ -41,8 +41,9 @@ function runBrushFill(player, dimension, runs, pattern, includeAir, label) {
  */
 function* brushFillJob(dimension, runs, pattern, includeAir, playerName, label) {
     const range = dimension.heightRange;
+    const total = runs.reduce((sum, run) => sum + run.length, 0);
     const changes = [];
-    const record = { dimensionId: dimension.id, changes, label, blocks: 0, tick: system.currentTick };
+    const record = { dimensionId: dimension.id, changes, label, blocks: total, tick: system.currentTick };
     pushUndo(playerName, record);
     let processed = 0;
     for (const run of runs) {
@@ -68,13 +69,12 @@ function* brushFillJob(dimension, runs, pattern, includeAir, playerName, label) 
             changes.push({ location: loc, before, after: placed });
         }
     }
-    record.blocks = changes.length;
     if (changes.length === 0) {
         discardUndo(playerName, record);
     }
     const player = world.getAllPlayers().find((p) => p.name === playerName);
     if (player) {
-        player.onScreenDisplay.setActionBar("§a" + label + "§a: §f" + changes.length + "§a block(s)");
+        player.onScreenDisplay.setActionBar("§a" + label + "§a: §f" + total + "§a block(s) set");
     }
 }
 
