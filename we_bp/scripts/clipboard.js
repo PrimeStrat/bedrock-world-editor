@@ -1,4 +1,4 @@
-import { world, StructureManager, StructureSaveMode, StructureRotation, StructureMirror, Dimension, Player } from "@minecraft/server";
+import { world, StructureManager, StructureSaveMode, StructureRotation, StructureMirrorAxis, Dimension, Player } from "@minecraft/server";
 import { pasteRegion } from "./operations/paste.js";
 
 const TILE = 64;
@@ -198,23 +198,23 @@ function transformedMinFromPivot(offset, size, quarters, flipX, flipZ) {
 }
 
 /**
- * Maps flip flags to the StructureMirror value used at placement. Mirroring
+ * Maps flip flags to the StructureMirrorAxis value used at placement. Mirroring
  * across the Z axis flips X coordinates and vice versa.
  * @param {boolean} flipX Whether local X coordinates are mirrored.
  * @param {boolean} flipZ Whether local Z coordinates are mirrored.
- * @returns {string} The StructureMirror value.
+ * @returns {string} The StructureMirrorAxis value.
  */
 function mirrorFor(flipX, flipZ) {
     if (flipX && flipZ) {
-        return StructureMirror.XZ;
+        return StructureMirrorAxis.XZ;
     }
     if (flipX) {
-        return StructureMirror.Z;
+        return StructureMirrorAxis.Z;
     }
     if (flipZ) {
-        return StructureMirror.X;
+        return StructureMirrorAxis.X;
     }
-    return StructureMirror.None;
+    return StructureMirrorAxis.None;
 }
 
 /**
