@@ -4,6 +4,7 @@ import { clearWorldEditStructures } from "./operations/undo.js";
 import { setPos1, setPos2 } from "./session.js";
 import { WE_CONFIG } from "./config.js";
 import { applyBrush } from "./actions/brush.js";
+import { mirrorPlacement, mirrorBreak } from "./actions/symmetry.js";
 import { selectionSizeSuffix } from "./actions/selection.js";
 
 const POS1_COOLDOWN_TICKS = 5;
@@ -54,6 +55,14 @@ world.afterEvents.itemUse.subscribe(ev => {
     if (ev.source.getGameMode() == GameMode.Creative) {
         applyBrush(ev.source, ev.itemStack);
     }
+});
+
+world.afterEvents.playerPlaceBlock.subscribe(ev => {
+    mirrorPlacement(ev.player, ev.block);
+});
+
+world.afterEvents.playerBreakBlock.subscribe(ev => {
+    mirrorBreak(ev.player, ev.block.location);
 });
 
 world.beforeEvents.playerInteractWithBlock.subscribe(ev => {

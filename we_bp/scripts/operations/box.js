@@ -4,8 +4,9 @@ import { WE_CONFIG } from "../config.js";
 import { CHUNK, chunkFloor, boxVolume, blockFilterFor, clampToHeight, pickPatternPermutation, cellMatchesFilter } from "./util.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan, areaFullyLoaded } from "./ticking.js";
 import { reserveBoxUndoSlot, snapshotBoxTiles } from "./undo.js";
-import { runTrackedJob } from "./jobs.js";
+import { runTrackedJob, chainJobs } from "./jobs.js";
 import { fallingBlockSweeper } from "./protect.js";
+import { mirrorBoxFor } from "../actions/symmetry.js";
 import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
 
 const CELLS_PER_YIELD = 256;
@@ -31,9 +32,18 @@ const CELLS_PER_YIELD = 256;
  */
 function runBoxEdit(player, dimension, min, max, pattern, matchId, includeAir, label) {
     const box = clampToHeight(dimension, min, max);
-    const useBusy = !areaFullyLoaded(dimension, box.min, box.max);
+    const mirror = mirrorBoxFor(player.name, dimension.id, box.min, box.max);
+    const useBusy = !areaFullyLoaded(dimension, box.min, box.max)
+        || Boolean(mirror && !areaFullyLoaded(dimension, mirror.min, mirror.max));
     if (useBusy) {
         setBusy(player.name, true);
+    }
+    if (mirror) {
+        runTrackedJob(player.name, chainJobs(
+            boxEditJob(dimension, box.min, box.max, pattern, matchId, includeAir, player.name, label, false),
+            boxEditJob(dimension, mirror.min, mirror.max, pattern, matchId, includeAir, player.name, label + " §7(mirrored)", useBusy)
+        ));
+        return;
     }
     runTrackedJob(player.name, boxEditJob(dimension, box.min, box.max, pattern, matchId, includeAir, player.name, label, useBusy));
 }

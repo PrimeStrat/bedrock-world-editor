@@ -1,7 +1,8 @@
 import { world, system, Dimension, Player } from "@minecraft/server";
 import { pushUndo, discardUndo } from "../session.js";
 import { AIR_ID, pickPatternPermutation } from "./util.js";
-import { runTrackedJob } from "./jobs.js";
+import { runTrackedJob, chainJobs } from "./jobs.js";
+import { mirrorRunsFor } from "../actions/symmetry.js";
 
 const BRUSH_CELLS_PER_YIELD = 512;
 
@@ -24,7 +25,16 @@ const BRUSH_CELLS_PER_YIELD = 512;
  * @returns {void}
  */
 function runBrushFill(player, dimension, runs, pattern, includeAir, label) {
-    runTrackedJob(player.name, brushFillJob(dimension, Array.from(runs), pattern, includeAir, player.name, label));
+    const runsArray = Array.from(runs);
+    const mirrored = mirrorRunsFor(player.name, dimension.id, runsArray);
+    if (mirrored) {
+        runTrackedJob(player.name, chainJobs(
+            brushFillJob(dimension, runsArray, pattern, includeAir, player.name, label),
+            brushFillJob(dimension, mirrored, pattern, includeAir, player.name, label + " §7(mirrored)")
+        ));
+        return;
+    }
+    runTrackedJob(player.name, brushFillJob(dimension, runsArray, pattern, includeAir, player.name, label));
 }
 
 /**

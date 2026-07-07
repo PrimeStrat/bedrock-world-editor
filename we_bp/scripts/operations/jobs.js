@@ -36,6 +36,17 @@ function runTrackedJob(playerName, generator) {
 }
 
 /**
+ * Runs two job generators back to back as one tracked job.
+ * @param {Generator} first The first job.
+ * @param {Generator} second The second job.
+ * @returns {Generator} The combined generator.
+ */
+function* chainJobs(first, second) {
+    yield* first;
+    yield* second;
+}
+
+/**
  * Stops every tracked job a player has running, without undoing the partial
  * work already done.
  * @param {string} playerName The player's name.
@@ -56,4 +67,4 @@ function cancelJobs(playerName) {
     return count;
 }
 
-export { runTrackedJob, cancelJobs };
+export { runTrackedJob, chainJobs, cancelJobs };

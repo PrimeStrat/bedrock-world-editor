@@ -3,7 +3,8 @@ import { pushUndo, discardUndo, setBusy } from "../session.js";
 import { WE_CONFIG } from "../config.js";
 import { AIR_ID, chunkFloor, pickPatternPermutation } from "./util.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan } from "./ticking.js";
-import { runTrackedJob } from "./jobs.js";
+import { runTrackedJob, chainJobs } from "./jobs.js";
+import { mirrorBoxFor } from "../actions/symmetry.js";
 
 /**
  * @typedef {{x: number, y: number, z: number}} Vec3
@@ -22,6 +23,14 @@ import { runTrackedJob } from "./jobs.js";
  */
 function runOverlay(player, dimension, min, max, pattern) {
     setBusy(player.name, true);
+    const mirror = mirrorBoxFor(player.name, dimension.id, min, max);
+    if (mirror) {
+        runTrackedJob(player.name, chainJobs(
+            overlayJob(dimension, min, max, pattern, player.name),
+            overlayJob(dimension, mirror.min, mirror.max, pattern, player.name)
+        ));
+        return;
+    }
     runTrackedJob(player.name, overlayJob(dimension, min, max, pattern, player.name));
 }
 

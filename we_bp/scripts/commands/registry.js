@@ -48,6 +48,8 @@ import { debugCommand } from "./debug.js";
 import { brushCommand, ebrushCommand } from "./brush.js";
 import { generateCommand } from "./generate.js";
 import { cancelCommand } from "./cancel.js";
+import { centerCommand } from "./center.js";
+import { symmetryCommand } from "./symmetry.js";
 
 const COMMANDS = [
     pos1Command,
@@ -114,7 +116,9 @@ const COMMANDS = [
     brushCommand,
     ebrushCommand,
     generateCommand,
-    cancelCommand
+    cancelCommand,
+    centerCommand,
+    symmetryCommand
 ];
 
 /**
@@ -126,6 +130,7 @@ function registerCommands(registry) {
     registry.registerEnum("we:direction", Object.keys(DIRECTIONS));
     registry.registerEnum("we:axis", ["x", "z"]);
     registry.registerEnum("we:brushshape", ["sphere", "cylinder", "hsphere", "hcylinder", "none"]);
+    registry.registerEnum("we:symmetryaction", ["set", "flip", "rotate", "clear"]);
     for (const command of COMMANDS) {
         registry.registerCommand(command.definition, command.handler);
     }

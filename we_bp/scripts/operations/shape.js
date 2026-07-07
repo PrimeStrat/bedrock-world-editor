@@ -3,8 +3,9 @@ import { pushUndo, setBusy } from "../session.js";
 import { chunkFloor, blockFilterFor, clampToHeight, pickPatternPermutation, cellMatchesFilter } from "./util.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan, areaFullyLoaded } from "./ticking.js";
 import { reserveBoxUndoSlot, snapshotRunTiles } from "./undo.js";
-import { runTrackedJob } from "./jobs.js";
+import { runTrackedJob, chainJobs } from "./jobs.js";
 import { fallingBlockSweeper } from "./protect.js";
+import { mirrorBoxFor, mirrorRunsFor } from "../actions/symmetry.js";
 import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
 
 const RUNS_PER_YIELD = 256;
@@ -34,11 +35,22 @@ const RUNS_PER_YIELD = 256;
  */
 function runShapeEdit(player, dimension, runs, bboxMin, bboxMax, pattern, includeAir, label, matchId, nativeMatch) {
     const box = clampToHeight(dimension, bboxMin, bboxMax);
-    const useBusy = !areaFullyLoaded(dimension, box.min, box.max);
+    const runsArray = Array.from(runs);
+    const mirrorBox = mirrorBoxFor(player.name, dimension.id, box.min, box.max);
+    const mirrorRuns = mirrorBox ? mirrorRunsFor(player.name, dimension.id, runsArray) : null;
+    const useBusy = !areaFullyLoaded(dimension, box.min, box.max)
+        || Boolean(mirrorRuns && !areaFullyLoaded(dimension, mirrorBox.min, mirrorBox.max));
     if (useBusy) {
         setBusy(player.name, true);
     }
-    runTrackedJob(player.name, shapeEditJob(dimension, Array.from(runs), box.min, box.max, pattern, includeAir, matchId ?? null, Boolean(nativeMatch), player.name, label, useBusy));
+    if (mirrorRuns) {
+        runTrackedJob(player.name, chainJobs(
+            shapeEditJob(dimension, runsArray, box.min, box.max, pattern, includeAir, matchId ?? null, Boolean(nativeMatch), player.name, label, false),
+            shapeEditJob(dimension, mirrorRuns, mirrorBox.min, mirrorBox.max, pattern, includeAir, matchId ?? null, Boolean(nativeMatch), player.name, label + " §7(mirrored)", useBusy)
+        ));
+        return;
+    }
+    runTrackedJob(player.name, shapeEditJob(dimension, runsArray, box.min, box.max, pattern, includeAir, matchId ?? null, Boolean(nativeMatch), player.name, label, useBusy));
 }
 
 /**
