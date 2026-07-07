@@ -105,6 +105,36 @@ function buildSelectionShell(player, blockText, includeAir, kind) {
 }
 
 /**
+ * Places a block or pattern at the center of the selection. Even-sized axes
+ * fill both middle cells, matching Java WorldEdit's //center.
+ * @param {Player} player The acting player.
+ * @param {string} blockText The block id or pattern to place.
+ * @returns {ActionResult} The result.
+ */
+function placeCenter(player, blockText) {
+    const region = requireRegion(player);
+    if (!region.ok) {
+        return region;
+    }
+    const pattern = parsePattern(blockText);
+    if (!pattern) {
+        return { ok: false, message: patternErrorMessage(blockText) };
+    }
+    const min = {
+        x: Math.floor((region.min.x + region.max.x) / 2),
+        y: Math.floor((region.min.y + region.max.y) / 2),
+        z: Math.floor((region.min.z + region.max.z) / 2)
+    };
+    const max = {
+        x: Math.ceil((region.min.x + region.max.x) / 2),
+        y: Math.ceil((region.min.y + region.max.y) / 2),
+        z: Math.ceil((region.min.z + region.max.z) / 2)
+    };
+    runBoxEdit(player, player.dimension, min, max, pattern, null, true, "Center §b" + pattern.label);
+    return { ok: true, message: "§aCenter placed at §f" + min.x + " " + min.y + " " + min.z + "§a." };
+}
+
+/**
  * Replaces the interior of the selection with air, leaving a one-block shell.
  * @param {Player} player The acting player.
  * @returns {ActionResult} The result.
@@ -190,4 +220,4 @@ function moveRegion(player, amount, directionName) {
     return { ok: true, message: "§aMove started..." };
 }
 
-export { setBlocks, replaceBlocks, buildSelectionShell, hollowSelection, overlaySelection, countBlocks, moveRegion };
+export { setBlocks, replaceBlocks, buildSelectionShell, placeCenter, hollowSelection, overlaySelection, countBlocks, moveRegion };
