@@ -28,11 +28,13 @@ const CELLS_PER_YIELD = 256;
  * @param {string|null} matchId Only fill cells of this block id (replace), or null for any.
  * @param {boolean} includeAir When false, cells currently air are not filled.
  * @param {string} label A short label for history and the completion message.
+ * @param {function(number, number, number): boolean|null} [mask] Optional cell mask; only masked-in cells fill.
  * @returns {void}
  */
-function runBoxEdit(player, dimension, min, max, pattern, matchId, includeAir, label) {
+function runBoxEdit(player, dimension, min, max, pattern, matchId, includeAir, label, mask) {
     const box = clampToHeight(dimension, min, max);
-    const mirror = mirrorBoxFor(player.name, dimension.id, box.min, box.max);
+    const cellMask = mask ?? null;
+    const mirror = cellMask ? null : mirrorBoxFor(player.name, dimension.id, box.min, box.max);
     const useBusy = !areaFullyLoaded(dimension, box.min, box.max)
         || Boolean(mirror && !areaFullyLoaded(dimension, mirror.min, mirror.max));
     if (useBusy) {
@@ -40,12 +42,12 @@ function runBoxEdit(player, dimension, min, max, pattern, matchId, includeAir, l
     }
     if (mirror) {
         runTrackedJob(player.name, chainJobs(
-            boxEditJob(dimension, box.min, box.max, pattern, matchId, includeAir, player.name, label, false),
-            boxEditJob(dimension, mirror.min, mirror.max, pattern, matchId, includeAir, player.name, label + " §7(mirrored)", useBusy)
+            boxEditJob(dimension, box.min, box.max, pattern, matchId, includeAir, null, player.name, label, false),
+            boxEditJob(dimension, mirror.min, mirror.max, pattern, matchId, includeAir, null, player.name, label + " §7(mirrored)", useBusy)
         ));
         return;
     }
-    runTrackedJob(player.name, boxEditJob(dimension, box.min, box.max, pattern, matchId, includeAir, player.name, label, useBusy));
+    runTrackedJob(player.name, boxEditJob(dimension, box.min, box.max, pattern, matchId, includeAir, cellMask, player.name, label, useBusy));
 }
 
 /**
@@ -65,10 +67,10 @@ function runBoxEdit(player, dimension, min, max, pattern, matchId, includeAir, l
  * @param {string} playerName The acting player's name.
  * @returns {Generator} The chunked fill generator.
  */
-function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outChanged, playerName) {
+function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, mask, outChanged, playerName) {
     const excludeId = pattern.entries.length === 1 ? pattern.entries[0].permutation.type.id : null;
     const blockFilter = blockFilterFor(matchId, includeAir, excludeId);
-    const single = pattern.entries.length === 1 && !matchId;
+    const single = pattern.entries.length === 1 && !matchId && !mask;
     const filtered = Boolean(matchId) || !includeAir;
     const sweep = fallingBlockSweeper(dimension, min, max);
     let changed = 0;
@@ -103,6 +105,9 @@ function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outC
                 let sinceYield = 0;
                 for (let x = areaMin.x; x <= areaMax.x; x++) {
                     for (let z = areaMin.z; z <= areaMax.z; z++) {
+                        if (mask && !mask(x, areaMin.y, z)) {
+                            continue;
+                        }
                         for (let y = areaMin.y; y <= areaMax.y; y++) {
                             const loc = { x, y, z };
                             const block = dimension.getBlock(loc);
@@ -149,7 +154,7 @@ function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outC
  * @param {boolean} useBusy Whether this job holds the busy flag.
  * @returns {Generator} The box edit job generator.
  */
-function* boxEditJob(dimension, min, max, pattern, matchId, includeAir, playerName, label, useBusy) {
+function* boxEditJob(dimension, min, max, pattern, matchId, includeAir, mask, playerName, label, useBusy) {
     debugStart(playerName, label);
     const slot = reserveBoxUndoSlot(playerName);
     const tiles = [];
@@ -161,14 +166,14 @@ function* boxEditJob(dimension, min, max, pattern, matchId, includeAir, playerNa
         tiles,
         min: { x: min.x, y: min.y, z: min.z },
         max: { x: max.x, y: max.y, z: max.z },
-        fill: { pattern, matchId, includeAir },
+        fill: { pattern, matchId, includeAir, mask },
         label,
         blocks: total,
         tick: system.currentTick
     };
     pushUndo(playerName, record);
     const outChanged = [0];
-    yield* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, outChanged, playerName);
+    yield* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, mask, outChanged, playerName);
     releaseTickArea(playerName);
     debugEnd(playerName);
     const acting = world.getAllPlayers().find((p) => p.name === playerName);
@@ -195,7 +200,7 @@ function* boxEditJob(dimension, min, max, pattern, matchId, includeAir, playerNa
  */
 function* refillBoxJob(dimension, record, playerName) {
     const outChanged = [0];
-    yield* fillBoxChunked(dimension, record.min, record.max, record.fill.pattern, record.fill.matchId, record.fill.includeAir, outChanged, playerName);
+    yield* fillBoxChunked(dimension, record.min, record.max, record.fill.pattern, record.fill.matchId, record.fill.includeAir, record.fill.mask ?? null, outChanged, playerName);
 }
 
 export { runBoxEdit, refillBoxJob };

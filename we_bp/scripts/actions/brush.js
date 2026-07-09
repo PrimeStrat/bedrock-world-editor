@@ -5,14 +5,17 @@ import { sphereRuns } from "../shapes/sphere.js";
 import { cylinderRuns } from "../shapes/cylinder.js";
 import { runBrushFill } from "../operations/brushfill.js";
 import { runTerrainBrush } from "../operations/terrain.js";
+import { gradientBands } from "./gradient.js";
 import { loadPlayerData, savePlayerData } from "../persist.js";
 
 const TOOL_SUFFIXES = ["_sword", "_pickaxe", "_axe", "_shovel", "_hoe"];
 const TOOL_KEY = "we:tools";
-const STROKE_INTERVAL_TICKS = 4;
+const CONFIG_KEY = "we:brushconfigs";
+const LOOP_INTERVAL_TICKS = 1;
 
 const toolCache = new Map();
-const strokes = new Map();
+const configCache = new Map();
+const loops = new Map();
 
 /**
  * @typedef {{kind: string, shape: string, blockText: string, radius: number, height: number, hollow: boolean, includeAir: boolean, surfaceOnly: boolean}} ToolDef
@@ -193,113 +196,82 @@ function unbindBrush(player) {
 }
 
 /**
- * Toggles a continuous tool stroke for a used item. When starting, the bound
- * tool applies every few ticks at the block the player looks at, connecting
- * consecutive positions so the stroke has no gaps. Using any tool item again
- * stops the stroke. Does nothing without a bound tool or outside creative op.
+ * Applies the bound tool once at the block the player looks at. Terrain tools
+ * sculpt the surface; brushes place shapes; paint acts on the exposed face;
+ * erase clears. Does nothing without a bound tool or outside creative op.
  * @param {Player} player The player who used the item.
  * @param {ItemStack} itemStack The used item.
  * @returns {void}
  */
-function toggleTool(player, itemStack) {
-    const active = strokes.get(player.name);
-    if (active) {
-        system.clearRun(active.intervalId);
-        strokes.delete(player.name);
-        player.onScreenDisplay.setActionBar("§7Tool off.");
+function applyToolClick(player, itemStack) {
+    if (itemStack.typeId === WE_CONFIG.wandItemId) {
         return;
     }
-    const tools = loadTools(player);
-    const tool = tools[itemStack.typeId];
+    const tool = loadTools(player)[itemStack.typeId];
     if (!tool || player.getGameMode() !== GameMode.Creative || player.playerPermissionLevel !== PlayerPermissionLevel.Operator) {
         return;
     }
+    const hit = player.getBlockFromViewDirection({ maxDistance: WE_CONFIG.brushRange, includePassableBlocks: false });
+    if (!hit) {
+        player.onScreenDisplay.setActionBar("§cNo block in sight.");
+        return;
+    }
     if (tool.kind === "terrain") {
-        applyTerrainClick(player, tool);
+        runTerrainBrush(player, player.dimension, hit.block.location, tool.radius, tool.strength, tool.mode);
         return;
     }
-    const state = { itemId: itemStack.typeId, last: null, intervalId: 0 };
-    state.intervalId = system.runInterval(() => strokeTick(player, state), STROKE_INTERVAL_TICKS);
-    strokes.set(player.name, state);
-    player.onScreenDisplay.setActionBar("§aTool on. Look to paint; use the item again to stop.");
+    applyToolAt(player, tool, hit.block.location, player.getViewDirection());
 }
 
 /**
- * Applies a terrain sculpt tool once at the block the player looks at. Called
- * per use so repeated clicks stack.
+ * Toggles a loop that re-applies the currently held tool every few ticks. The
+ * tool fires wherever the player looks; it stops on toggle, on leaving creative
+ * op, or when the held item's tool is put away.
  * @param {Player} player The acting player.
- * @param {object} tool The terrain tool definition.
- * @returns {void}
+ * @returns {ActionResult} The result.
  */
-function applyTerrainClick(player, tool) {
-    const hit = player.getBlockFromViewDirection({ maxDistance: WE_CONFIG.brushRange, includePassableBlocks: false });
-    if (!hit) {
-        player.onScreenDisplay.setActionBar("§cNo terrain in sight.");
-        return;
+function toggleLoopBrush(player) {
+    const active = loops.get(player.name);
+    if (active) {
+        system.clearRun(active);
+        loops.delete(player.name);
+        return { ok: true, message: "§7Loop brush off." };
     }
-    runTerrainBrush(player, player.dimension, hit.block.location, tool.radius, tool.strength, tool.mode);
+    const itemId = heldItemId(player);
+    if (!itemId || !(itemId in loadTools(player))) {
+        return { ok: false, message: "§cHold a bound tool first." };
+    }
+    const intervalId = system.runInterval(() => loopTick(player, itemId), LOOP_INTERVAL_TICKS);
+    loops.set(player.name, intervalId);
+    return { ok: true, message: "§aLoop brush on. Hold the tool and look; run again to stop." };
 }
 
 /**
- * Advances a tool stroke one step: raycasts to the looked-at block, applies
- * the tool there, and interpolates from the previous step so quick turns leave
- * no gap. Stops the stroke if the player leaves creative op or holds a
- * different item.
- * @param {Player} player The stroking player.
- * @param {object} state The stroke state.
+ * Advances a loop-brush step: re-applies the tool if the player still holds it
+ * in creative op, otherwise stops the loop.
+ * @param {Player} player The looping player.
+ * @param {string} itemId The tool item id the loop is bound to.
  * @returns {void}
  */
-function strokeTick(player, state) {
-    if (!player.isValid || player.getGameMode() !== GameMode.Creative || player.playerPermissionLevel !== PlayerPermissionLevel.Operator || heldItemId(player) !== state.itemId) {
-        system.clearRun(state.intervalId);
-        strokes.delete(player.name);
-        return;
-    }
-    const tool = loadTools(player)[state.itemId];
-    if (!tool) {
-        system.clearRun(state.intervalId);
-        strokes.delete(player.name);
+function loopTick(player, itemId) {
+    const loopId = loops.get(player.name);
+    const tool = loadTools(player)[itemId];
+    if (!player.isValid || player.getGameMode() !== GameMode.Creative || player.playerPermissionLevel !== PlayerPermissionLevel.Operator || heldItemId(player) !== itemId || !tool) {
+        if (loopId !== undefined) {
+            system.clearRun(loopId);
+        }
+        loops.delete(player.name);
         return;
     }
     const hit = player.getBlockFromViewDirection({ maxDistance: WE_CONFIG.brushRange, includePassableBlocks: false });
     if (!hit) {
         return;
     }
-    const target = hit.block.location;
-    if (state.last && state.last.x === target.x && state.last.y === target.y && state.last.z === target.z) {
+    if (tool.kind === "terrain") {
+        runTerrainBrush(player, player.dimension, hit.block.location, tool.radius, tool.strength, tool.mode);
         return;
     }
-    for (const point of strokePoints(state.last, target)) {
-        applyToolAt(player, tool, point, player.getViewDirection());
-    }
-    state.last = { x: target.x, y: target.y, z: target.z };
-}
-
-/**
- * Returns the block cells along the line from the previous stroke point to the
- * current target (exclusive of the previous), so a fast-moving stroke fills the
- * whole path. Returns just the target when there is no previous point.
- * @param {{x: number, y: number, z: number}|null} from The previous point.
- * @param {{x: number, y: number, z: number}} to The current point.
- * @returns {{x: number, y: number, z: number}[]} The path cells.
- */
-function strokePoints(from, to) {
-    if (!from) {
-        return [to];
-    }
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const dz = to.z - from.z;
-    const steps = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz));
-    if (steps <= 1) {
-        return [to];
-    }
-    const points = [];
-    for (let i = 1; i <= steps; i++) {
-        const t = i / steps;
-        points.push({ x: Math.round(from.x + dx * t), y: Math.round(from.y + dy * t), z: Math.round(from.z + dz * t) });
-    }
-    return points;
+    applyToolAt(player, tool, hit.block.location, player.getViewDirection());
 }
 
 /**
@@ -314,6 +286,10 @@ function strokePoints(from, to) {
  */
 function applyToolAt(player, tool, target, view) {
     setPatternPlayer(player.name);
+    if (tool.kind === "gradient") {
+        applyGradientBrush(player, tool, target, view);
+        return;
+    }
     const pattern = parsePattern(tool.blockText);
     if (!pattern) {
         player.onScreenDisplay.setActionBar("§cTool block is invalid.");
@@ -324,6 +300,66 @@ function applyToolAt(player, tool, target, view) {
         ? facingSurfaceRuns(player.dimension, target, tool.radius, view)
         : (tool.shape === "cylinder" ? cylinderRuns(target, tool.radius, tool.height, tool.hollow) : sphereRuns(target, tool.radius, tool.hollow));
     runBrushFill(player, player.dimension, runs, pattern, tool.includeAir, label, { surfaceOnly: false });
+}
+
+/**
+ * Returns the band block id for a spatial fraction (0 to 1) through gradient
+ * bands, each band occupying a share of the range proportional to its weight.
+ * @param {{id: string, weight: number}[]} bands The gradient bands.
+ * @param {number} t The spatial fraction from 0 to 1.
+ * @returns {string} The chosen block id.
+ */
+function bandAt(bands, t) {
+    let total = 0;
+    for (const band of bands) {
+        total += band.weight;
+    }
+    let cut = Math.max(0, Math.min(1, t)) * total;
+    for (const band of bands) {
+        cut -= band.weight;
+        if (cut < 0) {
+            return band.id;
+        }
+    }
+    return bands[bands.length - 1].id;
+}
+
+/**
+ * Applies a gradient at the target: each cell's block is chosen by its height
+ * within the brush (bottom to top) mapped through the gradient bands, forming
+ * an ordered vertical transition. Brush mode fills the whole sphere; paint mode
+ * only recolors the exposed surface facing the viewer. Cells are grouped by
+ * block so the stroke is one fill per distinct block.
+ * @param {Player} player The acting player.
+ * @param {object} tool The gradient tool definition.
+ * @param {{x: number, y: number, z: number}} target The target cell.
+ * @param {{x: number, y: number, z: number}} view The player's view direction.
+ * @returns {void}
+ */
+function applyGradientBrush(player, tool, target, view) {
+    const bands = gradientBands(player.name, tool.gradient);
+    if (!bands) {
+        player.onScreenDisplay.setActionBar("§cGradient #" + tool.gradient + " is gone.");
+        return;
+    }
+    const cells = tool.topOnly
+        ? facingSurfaceRuns(player.dimension, target, tool.radius, view)
+        : sphereRuns(target, tool.radius, false);
+    const span = tool.radius * 2;
+    const byBlock = new Map();
+    for (const run of cells) {
+        const t = span > 0 ? (run.y - (target.y - tool.radius)) / span : 0;
+        const id = bandAt(bands, t);
+        let group = byBlock.get(id);
+        if (!group) {
+            group = [];
+            byBlock.set(id, group);
+        }
+        group.push({ x: run.x, y: run.y, z: run.z, length: run.length });
+    }
+    for (const [id, runs] of byBlock.entries()) {
+        runBrushFill(player, player.dimension, runs, parsePattern(id), true, "Gradient §b#" + tool.gradient);
+    }
 }
 
 /**
@@ -373,15 +409,198 @@ function facingSurfaceRuns(dimension, target, radius, view) {
                 if (!block || block.isAir) {
                     continue;
                 }
-                const front = { x: loc.x + normal.x, y: loc.y + normal.y, z: loc.z + normal.z };
-                const frontBlock = dimension.isChunkLoaded(front) ? dimension.getBlock(front) : undefined;
-                if (!frontBlock || frontBlock.isAir) {
+                if (isExposedToward(dimension, loc, normal)) {
                     runs.push({ x: loc.x, y: loc.y, z: loc.z, length: 1 });
                 }
             }
         }
     }
     return runs;
+}
+
+/**
+ * Loads a player's saved brush configs (name to tool def) into the cache.
+ * @param {Player} player The owning player.
+ * @returns {Object<string, object>} The name-to-config map.
+ */
+function loadConfigs(player) {
+    let map = configCache.get(player.name);
+    if (!map) {
+        map = loadPlayerData(player, CONFIG_KEY, {});
+        configCache.set(player.name, map);
+    }
+    return map;
+}
+
+/**
+ * Persists a player's brush config map and refreshes the cache.
+ * @param {Player} player The owning player.
+ * @param {Object<string, object>} map The name-to-config map.
+ * @returns {void}
+ */
+function storeConfigs(player, map) {
+    configCache.set(player.name, map);
+    savePlayerData(player, CONFIG_KEY, Object.keys(map).length > 0 ? map : undefined);
+}
+
+/**
+ * Saves the tool currently bound to the player's held item as a named brush
+ * config for later binding to other items.
+ * @param {Player} player The owning player.
+ * @param {string} name The config name.
+ * @returns {ActionResult} The result.
+ */
+function saveConfig(player, name) {
+    const key = String(name ?? "").trim().toLowerCase();
+    if (key === "") {
+        return { ok: false, message: "§cName the config, e.g. /we:bind save mybrush." };
+    }
+    const itemId = heldItemId(player);
+    const tool = itemId ? loadTools(player)[itemId] : undefined;
+    if (!tool) {
+        return { ok: false, message: "§cHold a bound tool to save its config." };
+    }
+    const map = loadConfigs(player);
+    map[key] = tool;
+    storeConfigs(player, map);
+    return { ok: true, message: "§aSaved brush config §f" + key + "§a from §f" + shortName(itemId) + "§a." };
+}
+
+/**
+ * Deletes a saved brush config.
+ * @param {Player} player The owning player.
+ * @param {string} name The config name.
+ * @returns {ActionResult} The result.
+ */
+function deleteConfig(player, name) {
+    const key = String(name ?? "").trim().toLowerCase();
+    const map = loadConfigs(player);
+    if (!(key in map)) {
+        return { ok: false, message: "§cNo brush config named §f" + key + "§c." };
+    }
+    delete map[key];
+    storeConfigs(player, map);
+    return { ok: true, message: "§aBrush config §f" + key + "§a deleted." };
+}
+
+/**
+ * Returns a player's saved brush configs as name-and-detail entries.
+ * @param {Player} player The owning player.
+ * @returns {{name: string, detail: string}[]} The config entries.
+ */
+function configEntries(player) {
+    const map = loadConfigs(player);
+    return Object.keys(map).map((name) => ({ name, detail: toolDetail(map[name]) }));
+}
+
+/**
+ * Binds a saved brush config to the player's held tool item.
+ * @param {Player} player The acting player.
+ * @param {string} name The config name.
+ * @returns {ActionResult} The result.
+ */
+function bindConfig(player, name) {
+    const resolved = resolveToolItem(player, "");
+    if (!resolved.ok) {
+        return resolved;
+    }
+    const config = loadConfigs(player)[String(name).trim().toLowerCase()];
+    if (!config) {
+        return { ok: false, message: "§cNo brush config named §f" + name + "§c." };
+    }
+    saveTool(player, resolved.itemId, { ...config });
+    return { ok: true, message: "§aBound config §f" + name + "§a to §f" + shortName(resolved.itemId) + "§a." };
+}
+
+/**
+ * Binds a saved gradient to the held tool item. In brush mode it fills the
+ * whole sphere; in paint mode it only recolors the exposed surface facing the
+ * viewer. Either way blocks form the ordered vertical transition.
+ * @param {Player} player The acting player.
+ * @param {string} gradientName The gradient name.
+ * @param {number} radius The brush radius.
+ * @param {string} mode The apply mode ("brush" or "paint").
+ * @returns {ActionResult} The result.
+ */
+function bindGradient(player, gradientName, radius, mode) {
+    const resolved = resolveToolItem(player, "");
+    if (!resolved.ok) {
+        return resolved;
+    }
+    const key = String(gradientName).trim().toLowerCase();
+    if (!gradientBands(player.name, key)) {
+        return { ok: false, message: "§cNo gradient named §f#" + key + "§c." };
+    }
+    const r = Math.min(Math.max(1, Math.floor(radius)), WE_CONFIG.brushMaxRadius);
+    const paint = mode === "paint";
+    saveTool(player, resolved.itemId, { kind: "gradient", gradient: key, shape: "sphere", blockText: "", radius: r, height: 1, hollow: false, includeAir: true, topOnly: paint });
+    return { ok: true, message: "§aBound gradient §f#" + key + "§a (" + (paint ? "paint" : "brush") + ", radius " + r + ") to §f" + shortName(resolved.itemId) + "§a." };
+}
+
+/**
+ * Removes every tool bound to any of the player's items.
+ * @param {Player} player The owning player.
+ * @returns {ActionResult} The result.
+ */
+function clearAllTools(player) {
+    const tools = loadTools(player);
+    const count = Object.keys(tools).length;
+    if (count === 0) {
+        return { ok: false, message: "§cNo tools are bound." };
+    }
+    toolCache.set(player.name, {});
+    savePlayerData(player, TOOL_KEY, undefined);
+    return { ok: true, message: "§aCleared §f" + count + "§a bound tool(s)." };
+}
+
+/**
+ * Returns whether a cell is exposed on the viewer's side: its neighbor along
+ * the facing normal is air, or any face perpendicular to that axis is air.
+ * Testing the perpendicular faces too means corner and edge blocks, which are
+ * solid along the normal but open to the side, still count as surface.
+ * @param {import("@minecraft/server").Dimension} dimension The dimension to read.
+ * @param {{x: number, y: number, z: number}} loc The cell location.
+ * @param {{x: number, y: number, z: number}} normal The facing normal.
+ * @returns {boolean} True when the cell is exposed toward the viewer.
+ */
+function isExposedToward(dimension, loc, normal) {
+    const neighbors = [normal];
+    if (normal.x !== 0) {
+        neighbors.push({ x: 0, y: 1, z: 0 }, { x: 0, y: -1, z: 0 }, { x: 0, y: 0, z: 1 }, { x: 0, y: 0, z: -1 });
+    } else if (normal.y !== 0) {
+        neighbors.push({ x: 1, y: 0, z: 0 }, { x: -1, y: 0, z: 0 }, { x: 0, y: 0, z: 1 }, { x: 0, y: 0, z: -1 });
+    } else {
+        neighbors.push({ x: 1, y: 0, z: 0 }, { x: -1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }, { x: 0, y: -1, z: 0 });
+    }
+    for (const off of neighbors) {
+        const n = { x: loc.x + off.x, y: loc.y + off.y, z: loc.z + off.z };
+        const block = dimension.isChunkLoaded(n) ? dimension.getBlock(n) : undefined;
+        if (!block || block.isAir) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Returns a short description of a tool config's kind and settings.
+ * @param {object} tool The tool definition.
+ * @returns {string} The detail string.
+ */
+function toolDetail(tool) {
+    if (tool.kind === "brush") {
+        return tool.shape + " r" + tool.radius + " " + tool.blockText;
+    }
+    if (tool.kind === "erase") {
+        return "r" + tool.radius;
+    }
+    if (tool.kind === "terrain") {
+        return tool.mode + " r" + tool.radius + " s" + tool.strength;
+    }
+    if (tool.kind === "gradient") {
+        return "#" + tool.gradient + " r" + tool.radius;
+    }
+    return "r" + tool.radius + " " + tool.blockText;
 }
 
 /**
@@ -392,20 +611,7 @@ function facingSurfaceRuns(dimension, target, radius, view) {
  */
 function toolEntries(player) {
     const tools = loadTools(player);
-    return Object.keys(tools).map((item) => {
-        const tool = tools[item];
-        let detail;
-        if (tool.kind === "brush") {
-            detail = tool.shape + " r" + tool.radius + " " + tool.blockText;
-        } else if (tool.kind === "erase") {
-            detail = "r" + tool.radius;
-        } else if (tool.kind === "terrain") {
-            detail = tool.mode + " r" + tool.radius + " s" + tool.strength;
-        } else {
-            detail = "r" + tool.radius + " " + tool.blockText;
-        }
-        return { item: shortName(item), kind: tool.kind, detail };
-    });
+    return Object.keys(tools).map((item) => ({ item: shortName(item), kind: tools[item].kind, detail: toolDetail(tools[item]) }));
 }
 
-export { bindBrush, bindPaint, bindTerrain, unbindBrush, toggleTool, toolEntries };
+export { bindBrush, bindPaint, bindTerrain, unbindBrush, clearAllTools, saveConfig, deleteConfig, configEntries, bindConfig, bindGradient, applyToolClick, toggleLoopBrush, toolEntries };

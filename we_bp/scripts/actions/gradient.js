@@ -1,9 +1,10 @@
-import { world, EntityInventoryComponent, Player } from "@minecraft/server";
+import { world, BlockTypes, EntityInventoryComponent, Player } from "@minecraft/server";
 import { shortName, setGradientResolver } from "./common.js";
 import { loadPlayerData, savePlayerData } from "../persist.js";
 
 const GRADIENT_KEY = "we:gradients";
 const gradientCache = new Map();
+const pendingCaptures = new Map();
 
 /**
  * @typedef {{ok: boolean, message: string}} ActionResult
@@ -37,10 +38,12 @@ function storeGradients(player, map) {
 }
 
 /**
- * Scans the player's inventory and builds a weighted pattern string where each
- * block's weight is its total stack count. Non-block items are ignored.
+ * Scans the player's inventory into ordered gradient bands: one band per
+ * distinct block in inventory-slot order, its width set by the block's total
+ * count. Order defines the low-to-high transition; counts widen a block's band.
+ * Only real blocks are counted; non-block items are ignored.
  * @param {Player} player The scanning player.
- * @returns {{ok: true, pattern: string, label: string}|{ok: false, message: string}} The pattern or a failure.
+ * @returns {{ok: true, bands: {id: string, weight: number}[], label: string}|{ok: false, message: string}} The bands or a failure.
  */
 function scanInventory(player) {
     const inv = player.getComponent(EntityInventoryComponent.componentId);
@@ -48,31 +51,30 @@ function scanInventory(player) {
     if (!container) {
         return { ok: false, message: "§cNo inventory to scan." };
     }
+    const order = [];
     const counts = new Map();
     for (let i = 0; i < container.size; i++) {
         const item = container.getItem(i);
-        if (!item) {
+        if (!item || !BlockTypes.get(item.typeId)) {
             continue;
         }
-        const block = item.typeId;
-        counts.set(block, (counts.get(block) ?? 0) + item.amount);
+        if (!counts.has(item.typeId)) {
+            order.push(item.typeId);
+        }
+        counts.set(item.typeId, (counts.get(item.typeId) ?? 0) + item.amount);
     }
-    if (counts.size === 0) {
-        return { ok: false, message: "§cInventory is empty - add blocks to build a gradient." };
+    if (order.length === 0) {
+        return { ok: false, message: "§cNo blocks in inventory - add blocks first." };
     }
-    const parts = [];
-    const names = [];
-    for (const [id, count] of counts.entries()) {
-        parts.push(count + shortName(id));
-        names.push(count + "x " + shortName(id));
-    }
-    return { ok: true, pattern: parts.join(","), label: names.join(", ") };
+    const bands = order.map((id) => ({ id, weight: counts.get(id) }));
+    const label = bands.map((b) => b.weight + "x " + shortName(b.id)).join(" -> ");
+    return { ok: true, bands, label };
 }
 
 /**
- * Builds a gradient from the player's inventory and saves it under a name. The
- * gradient is a weighted blend where each block's chance scales with its count.
- * @param {Player} player The scanning player.
+ * Arms gradient capture under a name: the next stop scans the inventory into
+ * this gradient. Prompts the player to set up their blocks.
+ * @param {Player} player The acting player.
  * @param {string} name The gradient name.
  * @returns {ActionResult} The result.
  */
@@ -81,23 +83,39 @@ function startGradient(player, name) {
     if (key === "") {
         return { ok: false, message: "§cName the gradient, e.g. /we:gradient start mymix." };
     }
+    pendingCaptures.set(player.name, key);
+    return { ok: true, message: "§aBuilding gradient §f#" + key + "§a. Add blocks to your inventory in low-to-high order (count widens a band), then /we:gradient stop." };
+}
+
+/**
+ * Locks in the armed gradient by scanning the inventory into a weighted blend
+ * and saving it. Requires a prior start.
+ * @param {Player} player The acting player.
+ * @returns {ActionResult} The result.
+ */
+function stopGradient(player) {
+    const key = pendingCaptures.get(player.name);
+    if (!key) {
+        return { ok: false, message: "§cNothing to lock in. Use /we:gradient start <name> first." };
+    }
     const scan = scanInventory(player);
     if (!scan.ok) {
         return scan;
     }
+    pendingCaptures.delete(player.name);
     const map = loadGradients(player);
-    map[key] = scan.pattern;
+    map[key] = scan.bands;
     storeGradients(player, map);
-    return { ok: true, message: "§aGradient §f#" + key + "§a built from inventory: §b" + scan.label + "§a. Use it anywhere as §f#" + key + "§a." };
+    return { ok: true, message: "§aGradient §f#" + key + "§a locked in: §b" + scan.label + "§a. Bind it with /we:bind." };
 }
 
 /**
- * Removes a saved gradient.
+ * Deletes a saved gradient.
  * @param {Player} player The owning player.
  * @param {string} name The gradient name.
  * @returns {ActionResult} The result.
  */
-function stopGradient(player, name) {
+function deleteGradient(player, name) {
     const key = String(name ?? "").trim().toLowerCase();
     const map = loadGradients(player);
     if (!(key in map)) {
@@ -105,7 +123,7 @@ function stopGradient(player, name) {
     }
     delete map[key];
     storeGradients(player, map);
-    return { ok: true, message: "§aGradient §f#" + key + "§a removed." };
+    return { ok: true, message: "§aGradient §f#" + key + "§a deleted." };
 }
 
 /**
@@ -119,28 +137,38 @@ function listGradients(player) {
     if (names.length === 0) {
         return { ok: true, message: "§7No gradients. Add blocks to your inventory then /we:gradient start <name>." };
     }
-    const lines = names.map((name) => "§f#" + name + "§7: §b" + map[name]);
+    const lines = names.map((name) => "§f#" + name + "§7: §b" + bandsLabel(map[name]));
     return { ok: true, message: "§6Gradients:\n" + lines.join("\n") };
 }
 
 /**
- * Returns a player's saved gradients as name-to-pattern-string entries.
- * @param {Player} player The owning player.
- * @returns {{name: string, pattern: string}[]} The gradient entries.
+ * Formats gradient bands as a low-to-high block list for display.
+ * @param {{id: string, weight: number}[]} bands The gradient bands.
+ * @returns {string} The label.
  */
-function gradientEntries(player) {
-    const map = loadGradients(player);
-    return Object.keys(map).map((name) => ({ name, pattern: map[name] }));
+function bandsLabel(bands) {
+    return Array.isArray(bands) ? bands.map((b) => shortName(b.id)).join(" -> ") : "?";
 }
 
 /**
- * Resolves a "#name" gradient token to a player's stored weighted pattern
- * string, loading from persistence into the cache on a miss.
+ * Returns a player's saved gradients as name-and-band entries, skipping any
+ * stored in an old non-band format.
+ * @param {Player} player The owning player.
+ * @returns {{name: string, bands: {id: string, weight: number}[], label: string}[]} The gradient entries.
+ */
+function gradientEntries(player) {
+    const map = loadGradients(player);
+    return Object.keys(map).filter((name) => Array.isArray(map[name])).map((name) => ({ name, bands: map[name], label: bandsLabel(map[name]) }));
+}
+
+/**
+ * Returns a player's gradient bands by name, loading from persistence on a
+ * cache miss.
  * @param {string} playerName The owning player's name.
  * @param {string} name The gradient name.
- * @returns {string|null} The weighted pattern string, or null.
+ * @returns {{id: string, weight: number}[]|null} The bands, or null.
  */
-function resolveGradient(playerName, name) {
+function gradientBands(playerName, name) {
     let map = gradientCache.get(playerName);
     if (!map) {
         const player = world.getAllPlayers().find((p) => p.name === playerName);
@@ -149,9 +177,25 @@ function resolveGradient(playerName, name) {
         }
         map = loadGradients(player);
     }
-    return map[name] ?? null;
+    const value = map[String(name).trim().toLowerCase()];
+    return Array.isArray(value) ? value : null;
+}
+
+/**
+ * Resolves a "#name" gradient token to a weighted pattern string built from
+ * its bands, for flat fills where spatial ordering does not apply.
+ * @param {string} playerName The owning player's name.
+ * @param {string} name The gradient name.
+ * @returns {string|null} The weighted pattern string, or null.
+ */
+function resolveGradient(playerName, name) {
+    const bands = gradientBands(playerName, name);
+    if (!bands) {
+        return null;
+    }
+    return bands.map((b) => b.weight + shortName(b.id)).join(",");
 }
 
 setGradientResolver(resolveGradient);
 
-export { startGradient, stopGradient, listGradients, gradientEntries };
+export { startGradient, stopGradient, deleteGradient, listGradients, gradientEntries, gradientBands };

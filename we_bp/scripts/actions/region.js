@@ -48,7 +48,7 @@ function setBlocks(player, blockText, includeAir, label) {
     if (capped) {
         return capped;
     }
-    runBoxEdit(player, player.dimension, region.min, region.max, pattern, null, Boolean(includeAir), label + " §b" + pattern.label);
+    runBoxEdit(player, player.dimension, region.min, region.max, pattern, null, Boolean(includeAir), label + " §b" + pattern.label, region.mask);
     return { ok: true, message: "§a" + label + " started..." };
 }
 
@@ -77,7 +77,7 @@ function replaceBlocks(player, fromId, toText) {
     if (capped) {
         return capped;
     }
-    runBoxEdit(player, player.dimension, region.min, region.max, pattern, from, true, "Replace §b" + shortName(from) + "§7 -> §b" + pattern.label);
+    runBoxEdit(player, player.dimension, region.min, region.max, pattern, from, true, "Replace §b" + shortName(from) + "§7 -> §b" + pattern.label, region.mask);
     return { ok: true, message: "§aReplace started..." };
 }
 
@@ -100,7 +100,7 @@ function buildSelectionShell(player, blockText, includeAir, kind) {
     }
     const runs = kind === "walls" ? wallsRuns(region.min, region.max) : hollowCubeRuns(region.min, region.max);
     const label = (kind === "walls" ? "Walls " : "Faces ") + "§b" + pattern.label;
-    runShapeEdit(player, player.dimension, runs, region.min, region.max, pattern, Boolean(includeAir), label, null);
+    runShapeEdit(player, player.dimension, runs, region.min, region.max, pattern, Boolean(includeAir), label, null, false, region.mask);
     return { ok: true, message: "§a" + label + "§a started..." };
 }
 
@@ -144,6 +144,9 @@ function hollowSelection(player) {
     if (!region.ok) {
         return region;
     }
+    if (region.mask) {
+        return { ok: false, message: "§cHollow needs a box selection, not a polygon." };
+    }
     const min = { x: region.min.x + 1, y: region.min.y + 1, z: region.min.z + 1 };
     const max = { x: region.max.x - 1, y: region.max.y - 1, z: region.max.z - 1 };
     if (min.x > max.x || min.y > max.y || min.z > max.z) {
@@ -169,7 +172,7 @@ function overlaySelection(player, blockText) {
     if (!pattern) {
         return { ok: false, message: patternErrorMessage(blockText) };
     }
-    runOverlay(player, player.dimension, region.min, region.max, pattern);
+    runOverlay(player, player.dimension, region.min, region.max, pattern, region.mask);
     return { ok: true, message: "§aOverlay started..." };
 }
 

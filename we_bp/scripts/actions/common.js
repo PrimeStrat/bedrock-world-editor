@@ -1,6 +1,6 @@
 import { BlockPermutation, BlockTypes, Player } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
-import { getSelection, isBusy } from "../session.js";
+import { getSelection, getPolygon, isBusy } from "../session.js";
 import { boxVolume } from "../operations/util.js";
 import { axisFromView } from "../clipboard.js";
 
@@ -172,10 +172,42 @@ function busyGuard(player) {
 }
 
 /**
+ * Returns whether an XZ point is inside a polygon, using the even-odd rule.
+ * @param {number} x The test X (block center).
+ * @param {number} z The test Z (block center).
+ * @param {Vec3[]} poly The polygon vertices.
+ * @returns {boolean} True when inside.
+ */
+function pointInPolygon(x, z, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i].x + 0.5;
+        const zi = poly[i].z + 0.5;
+        const xj = poly[j].x + 0.5;
+        const zj = poly[j].z + 0.5;
+        if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) {
+            inside = !inside;
+        }
+    }
+    return inside;
+}
+
+/**
+ * Builds a mask function that returns true only for cells inside the given
+ * polygon (tested on the XZ plane at block centers).
+ * @param {Vec3[]} polygon The polygon vertices.
+ * @returns {function(number, number, number): boolean} The cell mask.
+ */
+function polygonMask(polygon) {
+    return (x, y, z) => pointInPolygon(x + 0.5, z + 0.5, polygon);
+}
+
+/**
  * Validates the common preconditions for a region edit: not busy, a full
- * selection, and a volume under the cap.
+ * selection, and a volume under the cap. Includes the polygon mask when the
+ * selection is a polygon so fills confine to its interior.
  * @param {Player} player The acting player.
- * @returns {{ok: true, min: Vec3, max: Vec3, volume: number}|{ok: false, message: string}} The region or a failure.
+ * @returns {{ok: true, min: Vec3, max: Vec3, volume: number, mask: function|null}|{ok: false, message: string}} The region or a failure.
  */
 function requireRegion(player) {
     const busy = busyGuard(player);
@@ -190,11 +222,13 @@ function requireRegion(player) {
     if (volume > WE_CONFIG.maxBlocks) {
         return { ok: false, message: "§cSelection too large (" + volume + " > " + WE_CONFIG.maxBlocks + ")." };
     }
+    const polygon = getPolygon(player.name);
     return {
         ok: true,
         min: { x: Math.min(pos1.x, pos2.x), y: Math.min(pos1.y, pos2.y), z: Math.min(pos1.z, pos2.z) },
         max: { x: Math.max(pos1.x, pos2.x), y: Math.max(pos1.y, pos2.y), z: Math.max(pos1.z, pos2.z) },
-        volume
+        volume,
+        mask: polygon && polygon.length >= 3 ? polygonMask(polygon) : null
     };
 }
 

@@ -1,11 +1,11 @@
 import { system, CommandPermissionLevel, CustomCommandParamType, CustomCommandStatus } from "@minecraft/server";
 import { getPlayer, toCommandResult, notPlayer } from "./common.js";
-import { startGradient, stopGradient, listGradients } from "../actions/gradient.js";
+import { startGradient, stopGradient, deleteGradient, listGradients } from "../actions/gradient.js";
 
 const gradientCommand = {
     definition: {
         name: "we:gradient",
-        description: "Gradient from inventory: start, stop, list. Use as #name.",
+        description: "Gradient from inventory: start, stop, delete, list.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false,
         mandatoryParameters: [{ type: CustomCommandParamType.Enum, name: "we:gradientaction" }],
@@ -20,13 +20,16 @@ const gradientCommand = {
             system.run(() => player.sendMessage(listGradients(player).message));
             return { status: CustomCommandStatus.Success };
         }
+        if (action === "stop") {
+            return toCommandResult(stopGradient(player));
+        }
         if (name === undefined) {
             return toCommandResult({ ok: false, message: "§cUsage: /we:gradient " + action + " <name>" });
         }
         if (action === "start") {
             return toCommandResult(startGradient(player, name));
         }
-        return toCommandResult(stopGradient(player, name));
+        return toCommandResult(deleteGradient(player, name));
     }
 };
 

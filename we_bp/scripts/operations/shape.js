@@ -33,9 +33,9 @@ const RUNS_PER_YIELD = 256;
  *   filter (fast; safe for ids with no family overlap, like liquids).
  * @returns {void}
  */
-function runShapeEdit(player, dimension, runs, bboxMin, bboxMax, pattern, includeAir, label, matchId, nativeMatch) {
+function runShapeEdit(player, dimension, runs, bboxMin, bboxMax, pattern, includeAir, label, matchId, nativeMatch, mask) {
     const box = clampToHeight(dimension, bboxMin, bboxMax);
-    const runsArray = Array.from(runs);
+    const runsArray = mask ? maskRuns(Array.from(runs), mask) : Array.from(runs);
     const mirrorBox = mirrorBoxFor(player.name, dimension.id, box.min, box.max);
     const mirrorRuns = mirrorBox ? mirrorRunsFor(player.name, dimension.id, runsArray) : null;
     const useBusy = !areaFullyLoaded(dimension, box.min, box.max)
@@ -51,6 +51,34 @@ function runShapeEdit(player, dimension, runs, bboxMin, bboxMax, pattern, includ
         return;
     }
     runTrackedJob(player.name, shapeEditJob(dimension, runsArray, box.min, box.max, pattern, includeAir, matchId ?? null, Boolean(nativeMatch), player.name, label, useBusy));
+}
+
+/**
+ * Clips shape runs to only the cells a mask allows, splitting a run into
+ * shorter runs where masked-out cells interrupt it.
+ * @param {Run[]} runs The shape runs.
+ * @param {function(number, number, number): boolean} mask The cell mask.
+ * @returns {Run[]} The masked runs.
+ */
+function maskRuns(runs, mask) {
+    const out = [];
+    for (const run of runs) {
+        let start = null;
+        for (let x = run.x; x < run.x + run.length; x++) {
+            if (mask(x, run.y, run.z)) {
+                if (start === null) {
+                    start = x;
+                }
+            } else if (start !== null) {
+                out.push({ x: start, y: run.y, z: run.z, length: x - start });
+                start = null;
+            }
+        }
+        if (start !== null) {
+            out.push({ x: start, y: run.y, z: run.z, length: run.x + run.length - start });
+        }
+    }
+    return out;
 }
 
 /**

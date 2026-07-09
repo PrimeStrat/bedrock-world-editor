@@ -1,7 +1,7 @@
 import { system, Player } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { spawnMarker, spawnMarkers } from "./marker.js";
-import { setPos1, setPos2 } from "../session.js";
+import { setPolygon } from "../session.js";
 
 const SAMPLE_INTERVAL_TICKS = 3;
 const MAX_POINTS = 512;
@@ -27,20 +27,19 @@ function sameCell(a, b) {
 }
 
 /**
- * Toggles draw mode for a player. Turning it on immediately starts tracing by
- * view; turning it off finalizes the traced path into a selection.
+ * Toggles whether draw mode is enabled. Enabling only arms the mode; it does
+ * not start a trace. Disabling cancels any active trace too.
  * @param {Player} player The acting player.
  * @returns {ActionResult} The result.
  */
 function toggleDrawMode(player) {
     if (drawModes.has(player.name)) {
         drawModes.delete(player.name);
-        finishTrace(player);
+        cancelTrace(player);
         return { ok: true, message: "§7Draw mode off." };
     }
     drawModes.add(player.name);
-    startTrace(player);
-    return { ok: true, message: "§aDraw mode on. Look to trace; toggle again to set the selection." };
+    return { ok: true, message: "§aDraw mode on. Click the wand to start tracing, again to set the selection." };
 }
 
 /**
@@ -50,6 +49,20 @@ function toggleDrawMode(player) {
  */
 function isDrawMode(playerName) {
     return drawModes.has(playerName);
+}
+
+/**
+ * Starts or finishes a trace for a player in draw mode: the wand click toggles
+ * the trace on and off within the enabled mode.
+ * @param {Player} player The acting player.
+ * @returns {void}
+ */
+function toggleTrace(player) {
+    if (traces.has(player.name)) {
+        finishTrace(player);
+    } else {
+        startTrace(player);
+    }
 }
 
 /**
@@ -129,27 +142,12 @@ function finishTrace(player) {
     }
     system.clearRun(state.intervalId);
     traces.delete(player.name);
-    if (state.points.length === 0) {
-        player.onScreenDisplay.setActionBar("§cNothing traced.");
+    if (state.points.length < 3) {
+        player.onScreenDisplay.setActionBar("§cTrace at least 3 points for a shape.");
         return;
     }
-    let minX = Infinity;
-    let minY = Infinity;
-    let minZ = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let maxZ = -Infinity;
-    for (const point of state.points) {
-        minX = Math.min(minX, point.x);
-        minY = Math.min(minY, point.y);
-        minZ = Math.min(minZ, point.z);
-        maxX = Math.max(maxX, point.x);
-        maxY = Math.max(maxY, point.y);
-        maxZ = Math.max(maxZ, point.z);
-    }
-    setPos1(player.name, { x: minX, y: minY, z: minZ });
-    setPos2(player.name, { x: maxX, y: maxY, z: maxZ });
-    player.sendMessage("§aSelection set from " + state.points.length + " traced points.");
+    setPolygon(player.name, state.points);
+    player.sendMessage("§aPolygon selection set from " + state.points.length + " traced points. Fills confine to its shape.");
 }
 
-export { toggleDrawMode, isDrawMode };
+export { toggleDrawMode, toggleTrace, isDrawMode };

@@ -56,6 +56,10 @@ import { bridgeCommand, ebridgeCommand } from "./bridge.js";
 import { terrainCommand } from "./terrain.js";
 import { drawCommand } from "./draw.js";
 import { smoothCommand } from "./smooth.js";
+import { loopBrushCommand } from "./loopbrush.js";
+import { clearBindCommand } from "./clearbind.js";
+import { bindCommand } from "./bind.js";
+import { posCommand } from "./pos.js";
 
 const COMMANDS = [
     pos1Command,
@@ -133,7 +137,11 @@ const COMMANDS = [
     ebridgeCommand,
     terrainCommand,
     drawCommand,
-    smoothCommand
+    smoothCommand,
+    loopBrushCommand,
+    clearBindCommand,
+    bindCommand,
+    posCommand
 ];
 
 /**
@@ -147,7 +155,7 @@ function registerCommands(registry) {
     registry.registerEnum("we:brushshape", ["sphere", "cylinder", "hsphere", "hcylinder", "none"]);
     registry.registerEnum("we:symmetryaction", ["set", "flip", "rotate", "radial", "status", "clear"]);
     registry.registerEnum("we:flipaxis", ["x", "y", "z"]);
-    registry.registerEnum("we:gradientaction", ["start", "stop", "list"]);
+    registry.registerEnum("we:gradientaction", ["start", "stop", "delete", "list"]);
     registry.registerEnum("we:terrainop", ["raise", "lower", "flatten", "smooth"]);
     registry.registerEnum("we:smoothmode", ["stable", "melt", "grow"]);
     registry.registerEnum("we:pathcurve", ["line", "arch", "catenary", "bezier"]);

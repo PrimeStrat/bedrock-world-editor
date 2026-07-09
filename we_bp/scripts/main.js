@@ -3,13 +3,12 @@ import { registerCommands } from "./commands/registry.js";
 import { clearWorldEditStructures } from "./operations/undo.js";
 import { setPos1, setPos2 } from "./session.js";
 import { WE_CONFIG } from "./config.js";
-import { toggleTool } from "./actions/brush.js";
+import { applyToolClick } from "./actions/brush.js";
 import { mirrorPlacement, mirrorBreak } from "./actions/symmetry.js";
-import { isDrawMode, toggleDrawMode } from "./actions/draw.js";
+import { isDrawMode, toggleTrace } from "./actions/draw.js";
 import { selectionSizeSuffix } from "./actions/selection.js";
 
 const POS1_COOLDOWN_TICKS = 5;
-const WAND_REACH = 7;
 const lastPos1Ticks = new Map();
 
 /**
@@ -57,13 +56,12 @@ world.afterEvents.itemUse.subscribe(ev => {
     const player = ev.source;
     if (player.getGameMode() !== GameMode.Creative) return;
     if (isWandUse(player, ev.itemStack)) {
-        const hit = player.getBlockFromViewDirection({ maxDistance: WAND_REACH, includePassableBlocks: false });
-        if (!hit) {
-            player.sendMessage(toggleDrawMode(player).message);
+        if (isDrawMode(player.name)) {
+            toggleTrace(player);
         }
         return;
     }
-    toggleTool(player, ev.itemStack);
+    applyToolClick(player, ev.itemStack);
 });
 
 world.afterEvents.playerPlaceBlock.subscribe(ev => {
@@ -80,9 +78,6 @@ world.beforeEvents.playerInteractWithBlock.subscribe(ev => {
     }
     ev.cancel = true;
     const player = ev.player;
-    if (isDrawMode(player.name)) {
-        return;
-    }
     const loc = ev.block.location;
     setPos2(player.name, loc);
     system.run(() => {

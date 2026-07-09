@@ -21,17 +21,18 @@ import { mirrorBoxFor } from "../actions/symmetry.js";
  * @param {FillPattern} pattern The fill pattern to place from.
  * @returns {void}
  */
-function runOverlay(player, dimension, min, max, pattern) {
+function runOverlay(player, dimension, min, max, pattern, mask) {
     setBusy(player.name, true);
-    const mirror = mirrorBoxFor(player.name, dimension.id, min, max);
+    const cellMask = mask ?? null;
+    const mirror = cellMask ? null : mirrorBoxFor(player.name, dimension.id, min, max);
     if (mirror) {
         runTrackedJob(player.name, chainJobs(
-            overlayJob(dimension, min, max, pattern, player.name),
-            overlayJob(dimension, mirror.min, mirror.max, pattern, player.name)
+            overlayJob(dimension, min, max, pattern, null, player.name),
+            overlayJob(dimension, mirror.min, mirror.max, pattern, null, player.name)
         ));
         return;
     }
-    runTrackedJob(player.name, overlayJob(dimension, min, max, pattern, player.name));
+    runTrackedJob(player.name, overlayJob(dimension, min, max, pattern, cellMask, player.name));
 }
 
 /**
@@ -44,7 +45,7 @@ function runOverlay(player, dimension, min, max, pattern) {
  * @param {string} playerName The editing player's name.
  * @returns {Generator} The overlay job generator.
  */
-function* overlayJob(dimension, min, max, pattern, playerName) {
+function* overlayJob(dimension, min, max, pattern, mask, playerName) {
     const changes = [];
     const record = { dimensionId: dimension.id, changes, label: "Overlay §b" + pattern.label, blocks: 0, tick: system.currentTick };
     pushUndo(playerName, record);
@@ -60,6 +61,9 @@ function* overlayJob(dimension, min, max, pattern, playerName) {
             }
             for (let x = areaMin.x; x <= areaMax.x; x++) {
                 for (let z = areaMin.z; z <= areaMax.z; z++) {
+                    if (mask && !mask(x, min.y, z)) {
+                        continue;
+                    }
                     for (let y = areaMax.y; y >= areaMin.y; y--) {
                         const block = dimension.getBlock({ x, y, z });
                         processed += 1;

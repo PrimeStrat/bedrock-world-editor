@@ -5,7 +5,7 @@ import { WE_CONFIG } from "./config.js";
  * @typedef {{x: number, y: number, z: number}} Vec3
  * @typedef {{location: Vec3, before: BlockPermutation, after: BlockPermutation}} BlockChange
  * @typedef {{dimensionId: string, changes: BlockChange[], label: string, blocks: number, tick: number}} EditRecord
- * @typedef {{pos1: Vec3|null, pos2: Vec3|null, undo: EditRecord[], redo: EditRecord[], busy: boolean}} PlayerSession
+ * @typedef {{pos1: Vec3|null, pos2: Vec3|null, polygon: Vec3[]|null, undo: EditRecord[], redo: EditRecord[], busy: boolean}} PlayerSession
  */
 
 /** @type {Map<string, PlayerSession>} */
@@ -61,7 +61,7 @@ function loadSelection(playerName, session) {
 function getSession(playerName) {
     let session = sessions.get(playerName);
     if (!session) {
-        session = { pos1: null, pos2: null, undo: [], redo: [], busy: false };
+        session = { pos1: null, pos2: null, polygon: null, undo: [], redo: [], busy: false };
         loadSelection(playerName, session);
         sessions.set(playerName, session);
     }
@@ -96,6 +96,7 @@ function setBusy(playerName, value) {
 function setPos1(playerName, location) {
     const session = getSession(playerName);
     session.pos1 = location;
+    session.polygon = null;
     persistSelection(playerName, session);
 }
 
@@ -108,7 +109,69 @@ function setPos1(playerName, location) {
 function setPos2(playerName, location) {
     const session = getSession(playerName);
     session.pos2 = location;
+    session.polygon = null;
     persistSelection(playerName, session);
+}
+
+/**
+ * Sets a player's polygon selection from a list of vertices. The selection
+ * becomes the polygon extruded between the lowest and highest vertex Y, and
+ * pos1/pos2 are set to its bounding box so region tools still work.
+ * @param {string} playerName The player's name.
+ * @param {Vec3[]} vertices The polygon vertices (at least 3).
+ * @returns {void}
+ */
+function setPolygon(playerName, vertices) {
+    const session = getSession(playerName);
+    session.polygon = vertices.map((v) => ({ x: v.x, y: v.y, z: v.z }));
+    let minX = Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let maxZ = -Infinity;
+    for (const v of vertices) {
+        minX = Math.min(minX, v.x);
+        minY = Math.min(minY, v.y);
+        minZ = Math.min(minZ, v.z);
+        maxX = Math.max(maxX, v.x);
+        maxY = Math.max(maxY, v.y);
+        maxZ = Math.max(maxZ, v.z);
+    }
+    session.pos1 = { x: minX, y: minY, z: minZ };
+    session.pos2 = { x: maxX, y: maxY, z: maxZ };
+    persistSelection(playerName, session);
+}
+
+/**
+ * Returns a player's polygon selection vertices, or null when none is set.
+ * @param {string} playerName The player's name.
+ * @returns {Vec3[]|null} The polygon vertices, or null.
+ */
+function getPolygon(playerName) {
+    return getSession(playerName).polygon;
+}
+
+/**
+ * Sets a numbered polygon vertex (1-based), growing the polygon, and refreshes
+ * the selection bounds. Vertex 1 starts a fresh polygon.
+ * @param {string} playerName The player's name.
+ * @param {number} index The 1-based vertex index.
+ * @param {Vec3} location The vertex block location.
+ * @returns {number} The current vertex count.
+ */
+function setPolyVertex(playerName, index, location) {
+    const session = getSession(playerName);
+    let verts = index <= 1 ? [] : (session.polygon ? session.polygon.slice() : []);
+    const i = Math.max(0, Math.floor(index) - 1);
+    verts[i] = { x: location.x, y: location.y, z: location.z };
+    for (let k = 0; k < verts.length; k++) {
+        if (!verts[k]) {
+            verts[k] = { x: location.x, y: location.y, z: location.z };
+        }
+    }
+    setPolygon(playerName, verts);
+    return verts.length;
 }
 
 /**
@@ -130,6 +193,7 @@ function clearSelection(playerName) {
     const session = getSession(playerName);
     session.pos1 = null;
     session.pos2 = null;
+    session.polygon = null;
     persistSelection(playerName, session);
 }
 
@@ -293,4 +357,4 @@ function getHistory(playerName) {
     };
 }
 
-export { getSession, setPos1, setPos2, getSelection, clearSelection, clearHistory, pushUndo, discardUndo, popUndo, popRedo, takeUndo, takeRedo, pushUndoRecord, pushRedoRecord, getHistory, isBusy, setBusy };
+export { getSession, setPos1, setPos2, setPolygon, setPolyVertex, getPolygon, getSelection, clearSelection, clearHistory, pushUndo, discardUndo, popUndo, popRedo, takeUndo, takeRedo, pushUndoRecord, pushRedoRecord, getHistory, isBusy, setBusy };

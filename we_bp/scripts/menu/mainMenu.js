@@ -1,5 +1,5 @@
 import { system, Player } from "@minecraft/server";
-import { ActionFormData } from "@minecraft/server-ui";
+import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
 import { getHistory } from "../session.js";
 import { showChestMenu } from "./chest.js";
 import { promptBlock, promptTwoBlocks, promptAmount, promptShape, promptBrush, promptGenerate, promptRadius, promptRotation, promptFlipAxis } from "./prompts.js";
@@ -10,7 +10,7 @@ import { buildSphere, buildCylinder, buildPyramid, generateShape } from "../acti
 import { removeNear, drainNear, replaceNear } from "../actions/utility.js";
 import { undoEdit, redoEdit, massUndo, massRedo, clearEditHistory } from "../actions/history.js";
 import { goUp, unstuck, ascendDescend, goThru, jumpTo, goCeil } from "../actions/navigation.js";
-import { bindBrush, unbindBrush, toolEntries } from "../actions/brush.js";
+import { bindBrush, unbindBrush, toolEntries, configEntries, bindConfig, bindGradient, saveConfig } from "../actions/brush.js";
 import { gradientEntries } from "../actions/gradient.js";
 
 /**
@@ -37,9 +37,10 @@ async function openMainMenu(player) {
         { slot: 4, icon: "textures/items/brick", hover: "§e§lGeneration§r\n§7Spheres, cylinders, pyramids", menu: true, run: (p) => openGenerationMenu(p) },
         { slot: 5, icon: "textures/items/paper", hover: "§e§lClipboard§r\n§7Copy, cut, paste, rotate...", menu: true, run: (p) => openClipboardMenu(p) },
         { slot: 6, icon: "textures/items/stick", hover: "§e§lBrushes§r\n§7Bind shapes to held items", menu: true, run: (p) => openBrushMenu(p) },
-        { slot: 12, icon: "textures/items/bucket_water", hover: "§e§lUtility§r\n§7Remove near, drain...", menu: true, run: (p) => openUtilityMenu(p) },
-        { slot: 13, icon: "textures/items/ender_pearl", hover: "§e§lNavigation§r\n§7Up, jump to, through walls...", menu: true, run: (p) => openNavigationMenu(p) },
-        { slot: 14, icon: "textures/items/book_writable", hover: "§e§lHistory§r\n§7Edit list, undo, redo", menu: true, run: (p) => openHistoryMenu(p, 0) }
+        { slot: 11, icon: "textures/items/bucket_water", hover: "§e§lUtility§r\n§7Remove near, drain...", menu: true, run: (p) => openUtilityMenu(p) },
+        { slot: 12, icon: "textures/items/ender_pearl", hover: "§e§lNavigation§r\n§7Up, jump to, through walls...", menu: true, run: (p) => openNavigationMenu(p) },
+        { slot: 13, icon: "textures/items/book_writable", hover: "§e§lHistory§r\n§7Edit list, undo, redo", menu: true, run: (p) => openHistoryMenu(p, 0) },
+        { slot: 14, icon: "textures/items/nether_star", hover: "§e§lBind§r\n§7Gradients and brush configs", menu: true, run: (p) => openBindMenu(p) }
     ]);
 }
 
@@ -465,4 +466,52 @@ async function openHistoryMenu(player, page) {
     await showChestMenu(player, "§8History " + (current + 1) + "/" + pages, entries);
 }
 
-export { openMainMenu, openHistoryMenu };
+/**
+ * Opens the bind chest menu: lists saved gradients and brush configs to bind
+ * to the held tool, plus an option to save the held tool as a config.
+ * @param {Player} player The player to show to.
+ * @returns {Promise<void>} Resolves when the menu closes.
+ */
+async function openBindMenu(player) {
+    const gradients = gradientEntries(player);
+    const configs = configEntries(player);
+    const entries = [];
+    let slot = 0;
+    for (const grad of gradients) {
+        entries.push({
+            slot, icon: "textures/items/dye_powder_green", hover: "§a§l#" + grad.name + "§r\n§7" + grad.label + "\n§eBind gradient to held tool", run: async (p) => {
+                const form = new ModalFormData().title("Bind #" + grad.name)
+                    .dropdown("Apply as", ["Brush (fill sphere)", "Paint (surface only)"], { defaultValueIndex: 0 })
+                    .slider("Radius", 1, 5, { valueStep: 1, defaultValue: 3 });
+                const res = await form.show(p);
+                if (!res.canceled && res.formValues) {
+                    const mode = Number(res.formValues[0]) === 1 ? "paint" : "brush";
+                    report(p, bindGradient(p, grad.name, Number(res.formValues[1]), mode));
+                }
+            }
+        });
+        slot += 1;
+    }
+    for (const cfg of configs) {
+        entries.push({
+            slot, icon: "textures/items/diamond_pickaxe", hover: "§e§l" + cfg.name + "§r\n§7" + cfg.detail + "\n§eBind config to held tool", run: (p) => report(p, bindConfig(p, cfg.name))
+        });
+        slot += 1;
+    }
+    if (entries.length === 0) {
+        entries.push({ slot: 4, icon: "textures/items/book_normal", hover: "§7Nothing saved.\n§7Make a gradient or save a tool.", menu: true, run: (p) => openBindMenu(p) });
+    }
+    entries.push({
+        slot: 22, icon: "textures/items/nether_star", hover: "§e§lSave Held Tool§r\n§7Save your held tool as a config", run: async (p) => {
+            const form = new ModalFormData().title("Save Brush Config").textField("Config name", "mybrush");
+            const res = await form.show(p);
+            if (!res.canceled && res.formValues) {
+                report(p, saveConfig(p, String(res.formValues[0])));
+            }
+        }
+    });
+    entries.push({ slot: 26, icon: "textures/items/dye_powder_red", hover: "§c§lBack", menu: true, run: (p) => openMainMenu(p) });
+    await showChestMenu(player, "§8Bind", entries);
+}
+
+export { openMainMenu, openHistoryMenu, openBindMenu };
