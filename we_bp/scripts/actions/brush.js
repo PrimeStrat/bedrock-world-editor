@@ -119,11 +119,11 @@ function bindBrush(player, shape, blockText, radius, height, hollow, includeAir,
 }
 
 /**
- * Binds a paint, replace, or erase tool to a tool item. Paint and replace take
- * a block or pattern and act only on the top-most block of each column in the
- * radius, unlike a brush which fills a whole sphere. Erase clears the sphere.
+ * Binds a paint or erase tool to a tool item. Paint replaces the top-most
+ * block of each column in the radius with a block or pattern, unlike a brush
+ * which fills a whole sphere. Erase clears the sphere.
  * @param {Player} player The acting player.
- * @param {string} kind The tool kind ("paint", "replace", or "erase").
+ * @param {string} kind The tool kind ("paint" or "erase").
  * @param {string} blockText The block id or pattern, ignored for erase.
  * @param {number} radius The paint radius.
  * @param {string} itemText A tool item id, or empty to use the held item.
@@ -169,9 +169,9 @@ function unbindBrush(player) {
 
 /**
  * Applies the tool bound to a used item at the block the player is looking
- * at. Tools bypass the busy guard so they can be used continuously. Paint and
- * replace act on surfaces; erase clears; brushes place shapes. Patterns may be
- * "#name" gradients. Does nothing without a tool or outside creative op.
+ * at. Tools bypass the busy guard so they can be used continuously. Paint acts
+ * on the top-most surface block; erase clears; brushes place shapes. Patterns
+ * may be "#name" gradients. Does nothing without a tool or outside creative op.
  * @param {Player} player The player who used the item.
  * @param {ItemStack} itemStack The used item.
  * @returns {void}
@@ -189,17 +189,16 @@ function applyBrush(player, itemStack) {
         return;
     }
     const target = hit.block.location;
-    const matchId = tool.kind === "replace" ? hit.block.typeId : null;
     const pattern = parsePattern(tool.blockText);
     if (!pattern) {
         player.onScreenDisplay.setActionBar("§cTool block is invalid.");
         return;
     }
-    const label = (tool.kind === "erase" ? "Erase" : tool.kind === "paint" ? "Paint" : tool.kind === "replace" ? "Replace" : "Brush") + " §b" + pattern.label;
+    const label = (tool.kind === "erase" ? "Erase" : tool.kind === "paint" ? "Paint" : "Brush") + " §b" + pattern.label;
     const runs = tool.topOnly
         ? topColumnRuns(player.dimension, target, tool.radius)
         : (tool.shape === "cylinder" ? cylinderRuns(target, tool.radius, tool.height, tool.hollow) : sphereRuns(target, tool.radius, tool.hollow));
-    runBrushFill(player, player.dimension, runs, pattern, tool.includeAir, label, { matchId, surfaceOnly: false });
+    runBrushFill(player, player.dimension, runs, pattern, tool.includeAir, label, { surfaceOnly: false });
 }
 
 /**

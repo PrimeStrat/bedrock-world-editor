@@ -50,7 +50,7 @@ import { generateCommand } from "./generate.js";
 import { cancelCommand } from "./cancel.js";
 import { centerCommand } from "./center.js";
 import { symmetryCommand } from "./symmetry.js";
-import { paintCommand, epaintCommand, replacePaintCommand, ereplacePaintCommand, eraseCommand } from "./paint.js";
+import { paintCommand, epaintCommand, eraseCommand } from "./paint.js";
 import { gradientCommand } from "./gradient.js";
 import { bridgeCommand, ebridgeCommand } from "./bridge.js";
 import { terrainCommand } from "./terrain.js";
@@ -127,8 +127,6 @@ const COMMANDS = [
     symmetryCommand,
     paintCommand,
     epaintCommand,
-    replacePaintCommand,
-    ereplacePaintCommand,
     eraseCommand,
     gradientCommand,
     bridgeCommand,
