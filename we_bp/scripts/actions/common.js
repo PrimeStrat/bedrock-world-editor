@@ -13,7 +13,7 @@ const DIRECTIONS = {
     west: { x: -1, y: 0, z: 0 }
 };
 
-const AIR_ID = "minecraft:air";
+const AIR_ID = "minecraft:air"; // We avoid AIR like the plague due to it sucking up performance
 const BUSY_MESSAGE = "§cAn edit is still running. Wait for it to finish.";
 const NO_SELECTION_MESSAGE = "§cSet both positions first (/we:pos1, /we:pos2 or the wand).";
 

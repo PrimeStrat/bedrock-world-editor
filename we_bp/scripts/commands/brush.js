@@ -12,7 +12,7 @@ function brushVariant(name, usePattern) {
     return {
         definition: {
             name,
-            description: "Bind a shape brush to your held tool (or an item id) using a block" + (usePattern ? " pattern (e.g. 50stone,50cobblestone)" : "") + ". Shape none unbinds.",
+            description: "Bind a shape brush to a tool. Shape none unbinds.",
             permissionLevel: CommandPermissionLevel.Admin,
             cheatsRequired: false,
             mandatoryParameters: [{ type: CustomCommandParamType.Enum, name: "we:brushshape" }],

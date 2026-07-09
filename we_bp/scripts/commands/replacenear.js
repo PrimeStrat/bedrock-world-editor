@@ -12,7 +12,7 @@ function replaceNearVariant(name, usePattern) {
     return {
         definition: {
             name,
-            description: "Replace one block with another block" + (usePattern ? " pattern (e.g. 50stone,50cobblestone)" : "") + " within a radius of you.",
+            description: "Replace one block with another within a radius.",
             permissionLevel: CommandPermissionLevel.Admin,
             cheatsRequired: false,
             mandatoryParameters: [

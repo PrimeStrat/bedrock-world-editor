@@ -49,7 +49,7 @@ function sendDebugReport(player) {
 }
 
 const debugCommand = {
-    definition: { name: "we:debug", description: "Show world-edit internals: ticking areas, edit progress, session state.", permissionLevel: CommandPermissionLevel.Admin, cheatsRequired: false },
+    definition: { name: "we:debug", description: "Show internals: ticking areas, progress, session state.", permissionLevel: CommandPermissionLevel.Admin, cheatsRequired: false },
     handler(origin) {
         const player = getPlayer(origin);
         if (!player) {

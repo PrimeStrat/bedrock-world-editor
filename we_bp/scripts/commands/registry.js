@@ -146,8 +146,9 @@ function registerCommands(registry) {
     registry.registerEnum("we:axis", ["x", "z"]);
     registry.registerEnum("we:brushshape", ["sphere", "cylinder", "hsphere", "hcylinder", "none"]);
     registry.registerEnum("we:symmetryaction", ["set", "flip", "rotate", "radial", "status", "clear"]);
+    registry.registerEnum("we:flipaxis", ["x", "y", "z"]);
     registry.registerEnum("we:gradientaction", ["start", "stop", "list"]);
-    registry.registerEnum("we:terrainop", ["raise", "lower", "set", "flatten"]);
+    registry.registerEnum("we:terrainop", ["raise", "lower", "flatten", "smooth"]);
     registry.registerEnum("we:smoothmode", ["stable", "melt", "grow"]);
     registry.registerEnum("we:pathcurve", ["line", "arch", "catenary", "bezier"]);
     registry.registerEnum("we:pathshape", ["deck", "tube"]);

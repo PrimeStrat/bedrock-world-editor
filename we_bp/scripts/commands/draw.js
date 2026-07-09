@@ -5,7 +5,7 @@ import { toggleDrawMode } from "../actions/draw.js";
 const drawCommand = {
     definition: {
         name: "we:draw",
-        description: "Toggle draw mode. While on, click the wand to start tracing your view, then click again to set the selection to the traced area.",
+        description: "Toggle draw mode: trace by looking to set a selection.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false
     },

@@ -13,7 +13,7 @@ function setVariant(name, label, usePattern) {
     return {
         definition: {
             name,
-            description: "Fill the selection with a block" + (usePattern ? " pattern (e.g. 50stone,50cobblestone)" : "") + ". Fills air too unless includeAir is false.",
+            description: "Fill the selection with a block or pattern.",
             permissionLevel: CommandPermissionLevel.Admin,
             cheatsRequired: false,
             mandatoryParameters: [{ type: usePattern ? CustomCommandParamType.String : CustomCommandParamType.BlockType, name: "block" }],

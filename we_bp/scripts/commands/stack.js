@@ -5,7 +5,7 @@ import { stackRegion } from "../actions/clipboard.js";
 const stackCommand = {
     definition: {
         name: "we:stack",
-        description: "Repeat the selection N times. Direction defaults to where you look.",
+        description: "Repeat the selection N times along your view.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false,
         mandatoryParameters: [{ type: CustomCommandParamType.Integer, name: "count" }],

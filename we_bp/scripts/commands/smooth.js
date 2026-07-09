@@ -7,7 +7,7 @@ import { requireRegion } from "../actions/common.js";
 const smoothCommand = {
     definition: {
         name: "we:smooth",
-        description: "Smooth the selection's surface by blurring its heights. Strength is the blur radius; mode biases the mass (stable, melt, grow).",
+        description: "Smooth the selection surface. Mode: stable, melt, grow.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false,
         optionalParameters: [

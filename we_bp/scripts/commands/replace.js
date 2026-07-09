@@ -12,7 +12,7 @@ function replaceVariant(name, usePattern) {
     return {
         definition: {
             name,
-            description: "Replace one block with another block" + (usePattern ? " pattern (e.g. 50stone,50cobblestone)" : "") + " inside the selection.",
+            description: "Replace one block with another in the selection.",
             permissionLevel: CommandPermissionLevel.Admin,
             cheatsRequired: false,
             mandatoryParameters: [

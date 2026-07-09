@@ -3,7 +3,7 @@ import { registerCommands } from "./commands/registry.js";
 import { clearWorldEditStructures } from "./operations/undo.js";
 import { setPos1, setPos2 } from "./session.js";
 import { WE_CONFIG } from "./config.js";
-import { applyBrush } from "./actions/brush.js";
+import { toggleTool } from "./actions/brush.js";
 import { mirrorPlacement, mirrorBreak } from "./actions/symmetry.js";
 import { isDrawMode, toggleDrawMode } from "./actions/draw.js";
 import { selectionSizeSuffix } from "./actions/selection.js";
@@ -63,7 +63,7 @@ world.afterEvents.itemUse.subscribe(ev => {
         }
         return;
     }
-    applyBrush(player, ev.itemStack);
+    toggleTool(player, ev.itemStack);
 });
 
 world.afterEvents.playerPlaceBlock.subscribe(ev => {

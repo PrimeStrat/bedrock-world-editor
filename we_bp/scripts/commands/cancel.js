@@ -6,7 +6,7 @@ import { releaseTickArea } from "../operations/ticking.js";
 import { debugEnd } from "../operations/debug.js";
 
 const cancelCommand = {
-    definition: { name: "we:cancel", description: "Stop your running edit where it is. Does not undo the blocks already placed.", permissionLevel: CommandPermissionLevel.Admin, cheatsRequired: false },
+    definition: { name: "we:cancel", description: "Stop your running edit; placed blocks stay (undoable).", permissionLevel: CommandPermissionLevel.Admin, cheatsRequired: false },
     handler(origin) {
         const player = getPlayer(origin);
         if (!player) {

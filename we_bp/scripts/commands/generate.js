@@ -6,7 +6,7 @@ import { promptGenerate } from "../menu/prompts.js";
 const generateCommand = {
     definition: {
         name: "we:generate",
-        description: "Fill the selection where a math expression of x, y, z (each -1..1) is true. No arguments opens the input form; block defaults to stone.",
+        description: "Fill selection where an x,y,z expression is true.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false,
         optionalParameters: [

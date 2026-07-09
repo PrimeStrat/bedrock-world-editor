@@ -12,7 +12,7 @@ function overlayVariant(name, usePattern) {
     return {
         definition: {
             name,
-            description: "Place a block" + (usePattern ? " pattern (e.g. 50stone,50cobblestone)" : "") + " on top of every column's surface in the selection.",
+            description: "Cover each column's surface in the selection.",
             permissionLevel: CommandPermissionLevel.Admin,
             cheatsRequired: false,
             mandatoryParameters: [{ type: usePattern ? CustomCommandParamType.String : CustomCommandParamType.BlockType, name: "block" }]

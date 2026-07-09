@@ -5,7 +5,7 @@ import { startGradient, stopGradient, listGradients } from "../actions/gradient.
 const gradientCommand = {
     definition: {
         name: "we:gradient",
-        description: "Build a weighted gradient from your inventory (block chances scale with count). start <name> to build, stop <name> to remove, list to view. Use it anywhere as #name.",
+        description: "Gradient from inventory: start, stop, list. Use as #name.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false,
         mandatoryParameters: [{ type: CustomCommandParamType.Enum, name: "we:gradientaction" }],

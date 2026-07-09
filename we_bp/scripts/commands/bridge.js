@@ -12,7 +12,7 @@ function bridgeVariant(name, usePattern) {
     return {
         definition: {
             name,
-            description: "Connect pos1 to pos2 with a path: curve type, curve amount, deck/tube shape, width across, thickness down, and extend-to-ground.",
+            description: "Path from pos1 to pos2: curve, width, thickness, shape.",
             permissionLevel: CommandPermissionLevel.Admin,
             cheatsRequired: false,
             mandatoryParameters: [{ type: usePattern ? CustomCommandParamType.String : CustomCommandParamType.BlockType, name: "block" }],

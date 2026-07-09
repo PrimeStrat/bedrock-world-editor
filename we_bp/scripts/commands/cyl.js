@@ -13,7 +13,7 @@ function cylVariant(name, usePattern, hollow) {
     return {
         definition: {
             name,
-            description: "Build a " + (hollow ? "hollow " : "") + "vertical cylinder from a block" + (usePattern ? " pattern (e.g. 50stone,50cobblestone)" : "") + " at your location.",
+            description: "Build a " + (hollow ? "hollow " : "") + "cylinder from a block or pattern.",
             permissionLevel: CommandPermissionLevel.Admin,
             cheatsRequired: false,
             mandatoryParameters: [

@@ -15,8 +15,8 @@ function paintVariant(name, kind, usePattern) {
         definition: {
             name,
             description: kind === "erase"
-                ? "Bind an erase tool to your held tool: use it to clear a sphere of blocks."
-                : "Bind a paint tool to your held tool. Replaces the top-most block of each column in the radius.",
+                ? "Bind an erase tool that clears a sphere of blocks."
+                : "Bind a paint tool for the surface facing you.",
             permissionLevel: CommandPermissionLevel.Admin,
             cheatsRequired: false,
             mandatoryParameters: params,

@@ -13,7 +13,7 @@ function shellVariant(name, kind, usePattern) {
     return {
         definition: {
             name,
-            description: (kind === "walls" ? "Build the four side walls of the selection" : "Build a hollow box shell around the selection") + " with a block" + (usePattern ? " pattern" : "") + ". Fills air too unless includeAir is false.",
+            description: (kind === "walls" ? "Build the selection's four side walls." : "Build a hollow box shell around the selection."),
             permissionLevel: CommandPermissionLevel.Admin,
             cheatsRequired: false,
             mandatoryParameters: [{ type: usePattern ? CustomCommandParamType.String : CustomCommandParamType.BlockType, name: "block" }],

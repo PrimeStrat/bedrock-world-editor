@@ -5,7 +5,7 @@ import { moveRegion } from "../actions/region.js";
 const moveCommand = {
     definition: {
         name: "we:move",
-        description: "Move the selection contents. Direction defaults to where you look.",
+        description: "Move the selection. Direction defaults to your view.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false,
         mandatoryParameters: [{ type: CustomCommandParamType.Integer, name: "amount" }],
