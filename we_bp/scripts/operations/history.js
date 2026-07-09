@@ -1,4 +1,4 @@
-import { world, system, Dimension, Player } from "@minecraft/server";
+import { world, Dimension, Player } from "@minecraft/server";
 import { setBusy } from "../session.js";
 import { WE_CONFIG } from "../config.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan } from "./ticking.js";
@@ -12,54 +12,133 @@ import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
  */
 
 /**
- * Reverses a recorded edit (undo). Box edits restore their snapshot structure
- * tiles; per-block edits restore each stored permutation.
+ * Reverses a recorded edit (undo) as a single-record batch.
  * @param {Player} player The player undoing.
  * @param {object} record The edit record to reverse.
  * @returns {void}
  */
 function applyUndo(player, record) {
-    const dimension = world.getDimension(record.dimensionId);
-    setBusy(player.name, true);
-    if (record.kind === "box" || record.kind === "shape") {
-        runTrackedJob(player.name, placeTilesJob(dimension, record.tiles, player.name, record.blocks));
-        return;
-    }
-    runTrackedJob(player.name, restoreJob(dimension, record.changes, "before", player.name, "Undo"));
+    applyHistoryBatch(player, [record], "undo", "Undo");
 }
 
 /**
- * Re-applies a recorded edit (redo). Box edits re-run their fill; per-block
- * edits restore each stored after-permutation.
+ * Re-applies a recorded edit (redo) as a single-record batch.
  * @param {Player} player The player redoing.
  * @param {object} record The edit record to re-apply.
  * @returns {void}
  */
 function applyRedo(player, record) {
-    const dimension = world.getDimension(record.dimensionId);
-    setBusy(player.name, true);
-    if (record.kind === "box") {
-        runTrackedJob(player.name, refillBoxJob(dimension, record, player.name));
-        return;
-    }
-    if (record.kind === "shape") {
-        runTrackedJob(player.name, refillShapeJob(dimension, record, player.name));
-        return;
-    }
-    runTrackedJob(player.name, restoreJob(dimension, record.changes, "after", player.name, "Redo"));
+    applyHistoryBatch(player, [record], "redo", "Redo");
 }
 
 /**
- * Generator that restores a box edit by placing its snapshot tiles back,
- * ticking each tile's chunks before placement, then messaging the player.
+ * Runs a sequence of history records in one tracked job with one summary
+ * message. Records must be ordered for the direction: newest first for undo,
+ * replay order for redo.
+ * @param {Player} player The acting player.
+ * @param {object[]} records The records to apply.
+ * @param {string} direction Either "undo" or "redo".
+ * @param {string} label A short label for the completion message.
+ * @returns {void}
+ */
+function applyHistoryBatch(player, records, direction, label) {
+    setBusy(player.name, true);
+    runTrackedJob(player.name, historyJob(records, direction, player.name, label));
+}
+
+/**
+ * Generator backing applyHistoryBatch: applies each record in order, then
+ * reports the combined result once.
+ * @param {object[]} records The records to apply.
+ * @param {string} direction Either "undo" or "redo".
+ * @param {string} playerName The acting player's name.
+ * @param {string} label A short label for the completion message.
+ * @returns {Generator} The batch job generator.
+ */
+function* historyJob(records, direction, playerName, label) {
+    debugStart(playerName, label);
+    let blocks = 0;
+    for (const record of records) {
+        if (direction === "undo") {
+            yield* undoRecordJob(record, playerName);
+        } else {
+            yield* redoRecordJob(record, playerName);
+        }
+        blocks += record.blocks;
+    }
+    releaseTickArea(playerName);
+    debugEnd(playerName);
+    const player = world.getAllPlayers().find((p) => p.name === playerName);
+    if (player) {
+        let message = "§a" + label + ": §f" + blocks + "§a block(s) " + (direction === "undo" ? "undone." : "redone.");
+        const skipped = debugSkipped(playerName);
+        if (skipped > 0) {
+            message += " §c" + skipped + " batch(es) skipped - run /we:debug.";
+        }
+        player.sendMessage(message);
+    }
+    setBusy(playerName, false);
+}
+
+/**
+ * Generator that reverses one record: groups recurse newest member first,
+ * box and shape edits restore their snapshot tiles, and per-block edits
+ * restore their before permutations.
+ * @param {object} record The record to reverse.
+ * @param {string} playerName The acting player's name.
+ * @returns {Generator} The undo generator.
+ */
+function* undoRecordJob(record, playerName) {
+    if (record.kind === "group") {
+        for (let i = record.records.length - 1; i >= 0; i--) {
+            yield* undoRecordJob(record.records[i], playerName);
+        }
+        return;
+    }
+    const dimension = world.getDimension(record.dimensionId);
+    if (record.kind === "box" || record.kind === "shape") {
+        yield* placeTilesCore(dimension, record.tiles, playerName);
+        return;
+    }
+    yield* restoreCore(dimension, record.changes, "before", playerName);
+}
+
+/**
+ * Generator that re-applies one record: groups recurse in replay order, box
+ * and shape edits re-run their fills, and per-block edits restore their
+ * after permutations.
+ * @param {object} record The record to re-apply.
+ * @param {string} playerName The acting player's name.
+ * @returns {Generator} The redo generator.
+ */
+function* redoRecordJob(record, playerName) {
+    if (record.kind === "group") {
+        for (const member of record.records) {
+            yield* redoRecordJob(member, playerName);
+        }
+        return;
+    }
+    const dimension = world.getDimension(record.dimensionId);
+    if (record.kind === "box") {
+        yield* refillBoxJob(dimension, record, playerName);
+        return;
+    }
+    if (record.kind === "shape") {
+        yield* refillShapeJob(dimension, record, playerName);
+        return;
+    }
+    yield* restoreCore(dimension, record.changes, "after", playerName);
+}
+
+/**
+ * Generator that places snapshot tiles back, grouped into span-sized ticking
+ * areas.
  * @param {Dimension} dimension The dimension to edit.
  * @param {{id: string, x: number, y: number, z: number}[]} tiles The snapshot tiles.
  * @param {string} playerName The acting player's name.
- * @param {number} blocks The block count for the completion message.
- * @returns {Generator} The tile placement job generator.
+ * @returns {Generator} The tile placement generator.
  */
-function* placeTilesJob(dimension, tiles, playerName, blocks) {
-    debugStart(playerName, "Undo (" + tiles.length + " tiles)");
+function* placeTilesCore(dimension, tiles, playerName) {
     const span = pickAreaSpan();
     const groups = new Map();
     for (const tile of tiles) {
@@ -98,18 +177,6 @@ function* placeTilesJob(dimension, tiles, playerName, blocks) {
             yield;
         }
     }
-    releaseTickArea(playerName);
-    debugEnd(playerName);
-    const player = world.getAllPlayers().find((p) => p.name === playerName);
-    if (player) {
-        let message = "§aUndo: §f" + blocks + "§a block(s) undone.";
-        const skipped = debugSkipped(playerName);
-        if (skipped > 0) {
-            message += " §c" + skipped + " tile(s) skipped - run /we:debug.";
-        }
-        player.sendMessage(message);
-    }
-    setBusy(playerName, false);
 }
 
 /**
@@ -133,15 +200,14 @@ function changesBounds(changes) {
 
 /**
  * Generator that restores stored permutations (before or after) in batches,
- * ticking the affected region first when it fits in one area.
+ * ticking the affected region first.
  * @param {Dimension} dimension The dimension to edit.
  * @param {object[]} changes The changes to restore.
  * @param {string} which Either "before" (undo) or "after" (redo).
  * @param {string} playerName The acting player's name.
- * @param {string} label A short label for the completion message.
- * @returns {Generator} The restore job generator.
+ * @returns {Generator} The restore generator.
  */
-function* restoreJob(dimension, changes, which, playerName, label) {
+function* restoreCore(dimension, changes, which, playerName) {
     if (changes.length > 0) {
         const bounds = changesBounds(changes);
         yield* tickAreaFor(dimension, bounds.min, bounds.max, playerName);
@@ -154,12 +220,6 @@ function* restoreJob(dimension, changes, which, playerName, label) {
             yield;
         }
     }
-    releaseTickArea(playerName);
-    const player = world.getAllPlayers().find((p) => p.name === playerName);
-    if (player) {
-        player.sendMessage("§a" + label + ": §f" + changes.length + "§a block(s) " + (label === "Undo" ? "undone." : "redone."));
-    }
-    setBusy(playerName, false);
 }
 
-export { applyUndo, applyRedo };
+export { applyUndo, applyRedo, applyHistoryBatch };

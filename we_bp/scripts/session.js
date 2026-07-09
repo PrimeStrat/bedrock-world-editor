@@ -177,6 +177,74 @@ function discardUndo(playerName, record) {
 }
 
 /**
+ * Removes and returns up to count records from the top of the undo stack,
+ * newest first, without touching redo.
+ * @param {string} playerName The player's name.
+ * @param {number} count How many records to take.
+ * @returns {EditRecord[]} The removed records, newest first.
+ */
+function takeUndo(playerName, count) {
+    const session = getSession(playerName);
+    const records = [];
+    for (let i = 0; i < count; i++) {
+        const record = session.undo.pop();
+        if (!record) {
+            break;
+        }
+        records.push(record);
+    }
+    return records;
+}
+
+/**
+ * Removes and returns up to count records from the top of the redo stack, in
+ * replay order, without touching undo.
+ * @param {string} playerName The player's name.
+ * @param {number} count How many records to take.
+ * @returns {EditRecord[]} The removed records, in replay order.
+ */
+function takeRedo(playerName, count) {
+    const session = getSession(playerName);
+    const records = [];
+    for (let i = 0; i < count; i++) {
+        const record = session.redo.pop();
+        if (!record) {
+            break;
+        }
+        records.push(record);
+    }
+    return records;
+}
+
+/**
+ * Pushes a record onto the undo stack without clearing redo.
+ * @param {string} playerName The player's name.
+ * @param {EditRecord} record The record to push.
+ * @returns {void}
+ */
+function pushUndoRecord(playerName, record) {
+    const session = getSession(playerName);
+    session.undo.push(record);
+    if (session.undo.length > WE_CONFIG.undoDepth) {
+        session.undo.shift();
+    }
+}
+
+/**
+ * Pushes a record onto the redo stack.
+ * @param {string} playerName The player's name.
+ * @param {EditRecord} record The record to push.
+ * @returns {void}
+ */
+function pushRedoRecord(playerName, record) {
+    const session = getSession(playerName);
+    session.redo.push(record);
+    if (session.redo.length > WE_CONFIG.undoDepth) {
+        session.redo.shift();
+    }
+}
+
+/**
  * Pops the most recent edit from a player's undo stack, moving it to redo.
  * @param {string} playerName The player's name.
  * @returns {EditRecord|null} The edit to reverse, or null when empty.
@@ -225,4 +293,4 @@ function getHistory(playerName) {
     };
 }
 
-export { getSession, setPos1, setPos2, getSelection, clearSelection, clearHistory, pushUndo, discardUndo, popUndo, popRedo, getHistory, isBusy, setBusy };
+export { getSession, setPos1, setPos2, getSelection, clearSelection, clearHistory, pushUndo, discardUndo, popUndo, popRedo, takeUndo, takeRedo, pushUndoRecord, pushRedoRecord, getHistory, isBusy, setBusy };

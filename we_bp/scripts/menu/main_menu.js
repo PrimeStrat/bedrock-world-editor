@@ -7,7 +7,7 @@ import { setBlocks, replaceBlocks, buildSelectionShell, hollowSelection, overlay
 import { copyRegion, cutRegion, pasteRegionAction, stackRegion, rotateAction, flipAction, clearClipboardAction } from "../actions/clipboard.js";
 import { buildSphere, buildCylinder, buildPyramid, generateShape } from "../actions/generation.js";
 import { removeNear, drainNear, replaceNear } from "../actions/utility.js";
-import { undoEdit, redoEdit, clearEditHistory } from "../actions/history.js";
+import { undoEdit, redoEdit, massUndo, massRedo, clearEditHistory } from "../actions/history.js";
 import { goUp, unstuck, ascendDescend, goThru, jumpTo, goCeil } from "../actions/navigation.js";
 import { bindBrush, unbindBrush } from "../actions/brush.js";
 
@@ -348,6 +348,9 @@ const HISTORY_PAGE_SIZE = 18;
  * @returns {string} The icon texture path.
  */
 function historyIcon(record) {
+    if (record.kind === "group") {
+        return "textures/items/book_writable";
+    }
     if (record.kind === "box") {
         return "textures/items/clay_ball";
     }
@@ -379,16 +382,22 @@ async function openHistoryMenu(player, page) {
     const start = current * HISTORY_PAGE_SIZE;
     const slice = records.slice(start, start + HISTORY_PAGE_SIZE);
     const entries = [];
+    const undoCount = history.undo.length;
     for (let i = 0; i < slice.length; i++) {
         const item = slice[i];
+        const absolute = start + i;
         const seconds = Math.max(0, Math.round((now - item.record.tick) / 20));
-        const state = item.redoable ? "§8(redoable)" : "§7#" + (start + i + 1);
+        const state = item.redoable ? "§8(redoable)" : "§7#" + (absolute + 1);
+        const action = item.redoable ? "§aClick to redo up to here" : "§aClick to undo up to here";
         entries.push({
             slot: i,
             icon: historyIcon(item.record),
-            hover: "§e§l" + item.record.label + "§r\n§7" + item.record.blocks + " block(s), " + seconds + "s ago " + state,
+            hover: "§e§l" + item.record.label + "§r\n§7" + item.record.blocks + " block(s), " + seconds + "s ago " + state + "\n" + action,
             menu: true,
-            run: (pl) => openHistoryMenu(pl, current)
+            run: (pl) => {
+                report(pl, item.redoable ? massRedo(pl, absolute - undoCount + 1) : massUndo(pl, absolute + 1));
+                return openHistoryMenu(pl, 0);
+            }
         });
     }
     if (records.length === 0) {

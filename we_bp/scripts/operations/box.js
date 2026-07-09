@@ -186,23 +186,16 @@ function* boxEditJob(dimension, min, max, pattern, matchId, includeAir, playerNa
 }
 
 /**
- * Job that re-applies a box edit's fill (redo) in ticked batches across ticks.
+ * Generator that re-applies a box edit's fill (redo) in ticked batches. The
+ * caller owns busy handling and completion messages.
  * @param {Dimension} dimension The dimension to edit.
  * @param {object} record The box edit record.
  * @param {string} playerName The redoing player's name.
- * @returns {Generator} The box redo job generator.
+ * @returns {Generator} The box refill generator.
  */
 function* refillBoxJob(dimension, record, playerName) {
-    debugStart(playerName, "Redo " + record.label);
     const outChanged = [0];
     yield* fillBoxChunked(dimension, record.min, record.max, record.fill.pattern, record.fill.matchId, record.fill.includeAir, outChanged, playerName);
-    releaseTickArea(playerName);
-    debugEnd(playerName);
-    const player = world.getAllPlayers().find((p) => p.name === playerName);
-    if (player) {
-        player.sendMessage("§aRedo: §f" + boxVolume(record.min, record.max) + "§a block(s) redone.");
-    }
-    setBusy(playerName, false);
 }
 
 export { runBoxEdit, refillBoxJob };

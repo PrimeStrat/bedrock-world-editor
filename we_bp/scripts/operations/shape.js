@@ -193,23 +193,16 @@ function* shapeEditJob(dimension, runs, bboxMin, bboxMax, pattern, includeAir, m
 }
 
 /**
- * Re-applies a shape edit (redo) by replaying its runs in ticked batches.
+ * Generator that re-applies a shape edit (redo) by replaying its runs in
+ * ticked batches. The caller owns busy handling and completion messages.
  * @param {Dimension} dimension The dimension to edit.
  * @param {object} record The shape edit record.
  * @param {string} playerName The redoing player's name.
- * @returns {Generator} The shape redo job generator.
+ * @returns {Generator} The shape refill generator.
  */
 function* refillShapeJob(dimension, record, playerName) {
-    debugStart(playerName, "Redo " + record.label);
     const outChanged = [0];
     yield* fillRunsChunked(dimension, record.runs, record.min, record.max, record.fill.pattern, record.fill.matchId, Boolean(record.fill.nativeMatch), record.fill.includeAir, outChanged, playerName);
-    releaseTickArea(playerName);
-    debugEnd(playerName);
-    const player = world.getAllPlayers().find((p) => p.name === playerName);
-    if (player) {
-        player.sendMessage("§aRedo: §f" + record.blocks + "§a block(s) redone.");
-    }
-    setBusy(playerName, false);
 }
 
 export { runShapeEdit, refillShapeJob };
