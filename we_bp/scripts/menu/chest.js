@@ -1,5 +1,5 @@
-import { system, Player } from "@minecraft/server";
-import { ActionFormData, FormCancelationReason } from "@minecraft/server-ui";
+import { Player } from "@minecraft/server";
+import { ActionFormData } from "@minecraft/server-ui";
 
 const CHEST_TITLE_27 = "§w§e§u§i§2§7§r";
 const NEUTRAL_CODE = "";
@@ -8,21 +8,6 @@ const CHEST_SLOTS = 27;
 /**
  * @typedef {{slot: number, icon: string, hover: string, run: function(Player):void, menu: boolean|undefined}} ChestEntry
  */
-
-/**
- * Shows a form, retrying next tick while the player's UI is busy.
- * @param {Player} player The player to show to.
- * @param {ActionFormData} form The form to show.
- * @returns {Promise<import("@minecraft/server-ui").ActionFormResponse>} The response.
- */
-async function showFormUntilSeen(player, form) {
-    const response = await form.show(player);
-    if (response.canceled && response.cancelationReason === FormCancelationReason.UserBusy) {
-        await new Promise((resolve) => system.run(resolve));
-        return showFormUntilSeen(player, form);
-    }
-    return response;
-}
 
 /**
  * Shows a 27-slot chest menu (routed by the shared chest UI title sentinel).
@@ -51,7 +36,7 @@ async function showChestMenu(player, title, entries) {
             ordered.push(null);
         }
     }
-    const response = await showFormUntilSeen(player, form);
+    const response = await form.show(player);
     if (response.canceled || response.selection === undefined) {
         return;
     }
@@ -67,4 +52,4 @@ async function showChestMenu(player, title, entries) {
     return showChestMenu(player, title, entries);
 }
 
-export { showChestMenu, showFormUntilSeen };
+export { showChestMenu };

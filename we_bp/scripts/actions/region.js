@@ -106,7 +106,7 @@ function buildSelectionShell(player, blockText, includeAir, kind) {
 
 /**
  * Places a block or pattern at the center of the selection. Even-sized axes
- * fill both middle cells, matching Java WorldEdit's //center.
+ * fill both middle cells.
  * @param {Player} player The acting player.
  * @param {string} blockText The block id or pattern to place.
  * @returns {ActionResult} The result.

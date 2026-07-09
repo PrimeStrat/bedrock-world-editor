@@ -1,7 +1,9 @@
 import { CustomCommandStatus, Player } from "@minecraft/server";
+import { setPatternPlayer } from "../actions/common.js";
 
 /**
  * Returns the player that ran a command, or null when not run by a player.
+ * Sets the gradient-token context to this player.
  * @param {object} origin The command origin.
  * @returns {Player|null} The player, or null.
  */
@@ -10,6 +12,7 @@ function getPlayer(origin) {
     if (!entity || typeof entity.sendMessage !== "function") {
         return null;
     }
+    setPatternPlayer(entity.name);
     return entity;
 }
 

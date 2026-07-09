@@ -50,6 +50,12 @@ import { generateCommand } from "./generate.js";
 import { cancelCommand } from "./cancel.js";
 import { centerCommand } from "./center.js";
 import { symmetryCommand } from "./symmetry.js";
+import { paintCommand, epaintCommand, replacePaintCommand, ereplacePaintCommand, eraseCommand } from "./paint.js";
+import { gradientCommand } from "./gradient.js";
+import { bridgeCommand, ebridgeCommand } from "./bridge.js";
+import { terrainCommand } from "./terrain.js";
+import { drawCommand } from "./draw.js";
+import { smoothCommand } from "./smooth.js";
 
 const COMMANDS = [
     pos1Command,
@@ -118,7 +124,18 @@ const COMMANDS = [
     generateCommand,
     cancelCommand,
     centerCommand,
-    symmetryCommand
+    symmetryCommand,
+    paintCommand,
+    epaintCommand,
+    replacePaintCommand,
+    ereplacePaintCommand,
+    eraseCommand,
+    gradientCommand,
+    bridgeCommand,
+    ebridgeCommand,
+    terrainCommand,
+    drawCommand,
+    smoothCommand
 ];
 
 /**
@@ -130,7 +147,12 @@ function registerCommands(registry) {
     registry.registerEnum("we:direction", Object.keys(DIRECTIONS));
     registry.registerEnum("we:axis", ["x", "z"]);
     registry.registerEnum("we:brushshape", ["sphere", "cylinder", "hsphere", "hcylinder", "none"]);
-    registry.registerEnum("we:symmetryaction", ["set", "flip", "rotate", "clear"]);
+    registry.registerEnum("we:symmetryaction", ["set", "flip", "rotate", "radial", "status", "clear"]);
+    registry.registerEnum("we:gradientaction", ["start", "stop", "list"]);
+    registry.registerEnum("we:terrainop", ["raise", "lower", "set", "flatten"]);
+    registry.registerEnum("we:smoothmode", ["stable", "melt", "grow"]);
+    registry.registerEnum("we:pathcurve", ["line", "arch", "catenary", "bezier"]);
+    registry.registerEnum("we:pathshape", ["deck", "tube"]);
     for (const command of COMMANDS) {
         registry.registerCommand(command.definition, command.handler);
     }

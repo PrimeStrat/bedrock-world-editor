@@ -1,4 +1,5 @@
 import { system, Player } from "@minecraft/server";
+import { ActionFormData } from "@minecraft/server-ui";
 import { getHistory } from "../session.js";
 import { showChestMenu } from "./chest.js";
 import { promptBlock, promptTwoBlocks, promptAmount, promptShape, promptBrush, promptGenerate, promptRadius, promptRotation, promptFlipAxis } from "./prompts.js";
@@ -9,7 +10,8 @@ import { buildSphere, buildCylinder, buildPyramid, generateShape } from "../acti
 import { removeNear, drainNear, replaceNear } from "../actions/utility.js";
 import { undoEdit, redoEdit, massUndo, massRedo, clearEditHistory } from "../actions/history.js";
 import { goUp, unstuck, ascendDescend, goThru, jumpTo, goCeil } from "../actions/navigation.js";
-import { bindBrush, unbindBrush } from "../actions/brush.js";
+import { bindBrush, unbindBrush, toolEntries } from "../actions/brush.js";
+import { gradientEntries } from "../actions/gradient.js";
 
 /**
  * Sends an action result message to a player when one is present.
@@ -30,14 +32,14 @@ function report(player, result) {
  */
 async function openMainMenu(player) {
     await showChestMenu(player, "§8World Editor", [
-        { slot: 10, icon: "textures/items/wood_axe", hover: "§e§lSelection§r\n§7Wand, positions, expand...", menu: true, run: (p) => openSelectionMenu(p) },
-        { slot: 11, icon: "textures/items/diamond_pickaxe", hover: "§e§lRegion§r\n§7Set, replace, walls, move...", menu: true, run: (p) => openRegionMenu(p) },
-        { slot: 12, icon: "textures/items/paper", hover: "§e§lClipboard§r\n§7Copy, cut, paste, rotate...", menu: true, run: (p) => openClipboardMenu(p) },
-        { slot: 13, icon: "textures/items/brick", hover: "§e§lGeneration§r\n§7Spheres, cylinders, pyramids", menu: true, run: (p) => openGenerationMenu(p) },
-        { slot: 14, icon: "textures/items/bucket_water", hover: "§e§lUtility§r\n§7Remove near, drain...", menu: true, run: (p) => openUtilityMenu(p) },
-        { slot: 15, icon: "textures/items/ender_pearl", hover: "§e§lNavigation§r\n§7Up, jump to, through walls...", menu: true, run: (p) => openNavigationMenu(p) },
-        { slot: 16, icon: "textures/items/book_writable", hover: "§e§lHistory§r\n§7Edit list, undo, redo", menu: true, run: (p) => openHistoryMenu(p, 0) },
-        { slot: 4, icon: "textures/items/stick", hover: "§e§lBrushes§r\n§7Bind shapes to held items", menu: true, run: (p) => openBrushMenu(p) }
+        { slot: 2, icon: "textures/items/wood_axe", hover: "§e§lSelection§r\n§7Wand, positions, expand...", menu: true, run: (p) => openSelectionMenu(p) },
+        { slot: 3, icon: "textures/items/diamond_pickaxe", hover: "§e§lRegion§r\n§7Set, replace, walls, move...", menu: true, run: (p) => openRegionMenu(p) },
+        { slot: 4, icon: "textures/items/brick", hover: "§e§lGeneration§r\n§7Spheres, cylinders, pyramids", menu: true, run: (p) => openGenerationMenu(p) },
+        { slot: 5, icon: "textures/items/paper", hover: "§e§lClipboard§r\n§7Copy, cut, paste, rotate...", menu: true, run: (p) => openClipboardMenu(p) },
+        { slot: 6, icon: "textures/items/stick", hover: "§e§lBrushes§r\n§7Bind shapes to held items", menu: true, run: (p) => openBrushMenu(p) },
+        { slot: 12, icon: "textures/items/bucket_water", hover: "§e§lUtility§r\n§7Remove near, drain...", menu: true, run: (p) => openUtilityMenu(p) },
+        { slot: 13, icon: "textures/items/ender_pearl", hover: "§e§lNavigation§r\n§7Up, jump to, through walls...", menu: true, run: (p) => openNavigationMenu(p) },
+        { slot: 14, icon: "textures/items/book_writable", hover: "§e§lHistory§r\n§7Edit list, undo, redo", menu: true, run: (p) => openHistoryMenu(p, 0) }
     ]);
 }
 
@@ -213,14 +215,6 @@ async function openClipboardMenu(player) {
 async function openGenerationMenu(player) {
     await showChestMenu(player, "§8Generation", [
         {
-            slot: 16, icon: "textures/items/quartz", hover: "§e§lGenerate...§r\n§7Shape from a math expression", run: async (p) => {
-                const input = await promptGenerate(p);
-                if (input) {
-                    report(p, generateShape(p, input.expression, input.blockText));
-                }
-            }
-        },
-        {
             slot: 11, icon: "textures/items/snowball", hover: "§e§lSphere...§r\n§7Solid or hollow", run: async (p) => {
                 const input = await promptShape(p, "Build Sphere", "Radius", 64, false);
                 if (input) {
@@ -229,7 +223,7 @@ async function openGenerationMenu(player) {
             }
         },
         {
-            slot: 13, icon: "textures/items/blaze_rod", hover: "§e§lCylinder...§r\n§7Solid or hollow tube", run: async (p) => {
+            slot: 12, icon: "textures/items/blaze_rod", hover: "§e§lCylinder...§r\n§7Solid or hollow tube", run: async (p) => {
                 const input = await promptShape(p, "Build Cylinder", "Radius", 64, true);
                 if (input) {
                     report(p, buildCylinder(p, input.size, input.height, input.blockId, input.hollow, input.includeAir, null));
@@ -237,10 +231,18 @@ async function openGenerationMenu(player) {
             }
         },
         {
-            slot: 15, icon: "textures/items/gold_nugget", hover: "§e§lPyramid...§r\n§7Solid or hollow", run: async (p) => {
+            slot: 13, icon: "textures/items/gold_nugget", hover: "§e§lPyramid...§r\n§7Solid or hollow", run: async (p) => {
                 const input = await promptShape(p, "Build Pyramid", "Size", 64, false);
                 if (input) {
                     report(p, buildPyramid(p, input.size, input.blockId, input.hollow, input.includeAir));
+                }
+            }
+        },
+        {
+            slot: 14, icon: "textures/items/quartz", hover: "§e§lGenerate...§r\n§7Shape from a math expression", run: async (p) => {
+                const input = await promptGenerate(p);
+                if (input) {
+                    report(p, generateShape(p, input.expression, input.blockText));
                 }
             }
         },
@@ -336,8 +338,41 @@ async function openBrushMenu(player) {
             }
         },
         { slot: 15, icon: "textures/items/bucket_empty", hover: "§e§lUnbind§r\n§7Remove the brush from your held tool", run: (p) => report(p, unbindBrush(p)) },
+        { slot: 16, icon: "textures/items/book_normal", hover: "§e§lSaved Items§r\n§7View bound tools and gradients", menu: true, run: (p) => openSavedItemsForm(p) },
         { slot: 26, icon: "textures/items/dye_powder_red", hover: "§c§lBack", menu: true, run: (p) => openMainMenu(p) }
     ]);
+}
+
+/**
+ * Opens a read-only form listing the player's bound tools and saved gradients
+ * with their contents.
+ * @param {Player} player The player to show to.
+ * @returns {Promise<void>} Resolves when the form closes.
+ */
+async function openSavedItemsForm(player) {
+    const tools = toolEntries(player);
+    const gradients = gradientEntries(player);
+    const lines = [];
+    lines.push("§6Bound Tools");
+    if (tools.length === 0) {
+        lines.push("§7  none");
+    } else {
+        for (const tool of tools) {
+            lines.push("§f  " + tool.item + " §7- §e" + tool.kind + " §7(" + tool.detail + ")");
+        }
+    }
+    lines.push("");
+    lines.push("§6Gradients");
+    if (gradients.length === 0) {
+        lines.push("§7  none");
+    } else {
+        for (const grad of gradients) {
+            lines.push("§f  #" + grad.name + " §7- §b" + grad.pattern);
+        }
+    }
+    const form = new ActionFormData().title("§8Saved Items").body(lines.join("\n")).button("§cClose");
+    await form.show(player);
+    await openBrushMenu(player);
 }
 
 const HISTORY_PAGE_SIZE = 18;

@@ -1,6 +1,6 @@
 import { system, CommandPermissionLevel, CustomCommandStatus } from "@minecraft/server";
 import { getPlayer, notPlayer } from "./common.js";
-import { openMainMenu } from "../menu/main_menu.js";
+import { openMainMenu } from "../menu/mainMenu.js";
 
 const menuCommand = {
     definition: { name: "we:menu", description: "Open the World Editor menu.", permissionLevel: CommandPermissionLevel.Admin, cheatsRequired: false },

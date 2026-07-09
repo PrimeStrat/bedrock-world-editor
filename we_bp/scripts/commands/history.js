@@ -1,6 +1,6 @@
 import { system, CommandPermissionLevel, CustomCommandStatus } from "@minecraft/server";
 import { getPlayer, notPlayer } from "./common.js";
-import { openHistoryMenu } from "../menu/main_menu.js";
+import { openHistoryMenu } from "../menu/mainMenu.js";
 
 const historyCommand = {
     definition: { name: "we:history", description: "Open your world-edit history menu.", permissionLevel: CommandPermissionLevel.Admin, cheatsRequired: false },

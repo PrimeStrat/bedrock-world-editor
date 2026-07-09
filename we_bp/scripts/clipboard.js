@@ -52,7 +52,7 @@ function quartersFor(rotation) {
 /**
  * Copies the box between two corners into a per-player clipboard, tiling the
  * footprint into structures of up to 64x64 with height fitted to the selection.
- * The clipboard offset is stored relative to the player's position (Java-style).
+ * The clipboard offset is stored relative to the player's position.
  * @param {Player} player The copying player.
  * @param {Vec3} pos1 The first selection corner.
  * @param {Vec3} pos2 The second selection corner.

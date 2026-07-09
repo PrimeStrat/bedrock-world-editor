@@ -5,9 +5,11 @@ import { setPos1, setPos2 } from "./session.js";
 import { WE_CONFIG } from "./config.js";
 import { applyBrush } from "./actions/brush.js";
 import { mirrorPlacement, mirrorBreak } from "./actions/symmetry.js";
+import { isDrawMode, toggleDrawMode } from "./actions/draw.js";
 import { selectionSizeSuffix } from "./actions/selection.js";
 
 const POS1_COOLDOWN_TICKS = 5;
+const WAND_REACH = 7;
 const lastPos1Ticks = new Map();
 
 /**
@@ -52,9 +54,16 @@ world.beforeEvents.playerBreakBlock.subscribe(ev => {
 });
 
 world.afterEvents.itemUse.subscribe(ev => {
-    if (ev.source.getGameMode() == GameMode.Creative) {
-        applyBrush(ev.source, ev.itemStack);
+    const player = ev.source;
+    if (player.getGameMode() !== GameMode.Creative) return;
+    if (isWandUse(player, ev.itemStack)) {
+        const hit = player.getBlockFromViewDirection({ maxDistance: WAND_REACH, includePassableBlocks: false });
+        if (!hit) {
+            player.sendMessage(toggleDrawMode(player).message);
+        }
+        return;
     }
+    applyBrush(player, ev.itemStack);
 });
 
 world.afterEvents.playerPlaceBlock.subscribe(ev => {
@@ -71,6 +80,9 @@ world.beforeEvents.playerInteractWithBlock.subscribe(ev => {
     }
     ev.cancel = true;
     const player = ev.player;
+    if (isDrawMode(player.name)) {
+        return;
+    }
     const loc = ev.block.location;
     setPos2(player.name, loc);
     system.run(() => {

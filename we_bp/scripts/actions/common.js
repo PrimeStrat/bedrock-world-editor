@@ -38,15 +38,52 @@ function resolveBlockId(id) {
     return BlockTypes.get(full) ? full : null;
 }
 
+let gradientResolver = null;
+let patternPlayerName = "";
+
 /**
- * Parses a fill pattern: one block id, or a weighted comma list like
- * "50stone,50cobblestone" (Java-style "50%stone" also works). Entries without
- * a weight count as weight 1.
+ * Registers a resolver that expands a "#name" gradient token for a player to a
+ * weighted pattern string. Set once by the gradient module at load.
+ * @param {function(string, string): string|null} resolver The (playerName, name) resolver.
+ * @returns {void}
+ */
+function setGradientResolver(resolver) {
+    gradientResolver = resolver;
+}
+
+/**
+ * Sets the player whose gradients "#name" tokens resolve against. Set at each
+ * command or tool entry before patterns are parsed.
+ * @param {string} playerName The acting player's name.
+ * @returns {void}
+ */
+function setPatternPlayer(playerName) {
+    patternPlayerName = playerName;
+}
+
+/**
+ * Expands a leading "#name" gradient token to the acting player's stored
+ * weighted pattern string, or returns the text unchanged.
+ * @param {string} text The pattern text.
+ * @returns {string} The expanded text.
+ */
+function expandGradient(text) {
+    const trimmed = String(text).trim();
+    if (trimmed.startsWith("#") && gradientResolver && patternPlayerName) {
+        return gradientResolver(patternPlayerName, trimmed.slice(1).toLowerCase()) ?? trimmed;
+    }
+    return trimmed;
+}
+
+/**
+ * Parses a fill pattern: one block id, a weighted comma list like
+ * "50stone,50cobblestone" ("50%stone" also works), or a "#name" gradient
+ * token. Entries without a weight count as weight 1.
  * @param {string} text The pattern text.
  * @returns {FillPattern|null} The pattern, or null when any entry is invalid.
  */
 function parsePattern(text) {
-    const parts = String(text).split(",");
+    const parts = expandGradient(text).split(",");
     const entries = [];
     const names = [];
     let total = 0;
@@ -76,7 +113,7 @@ function parsePattern(text) {
  * @returns {string} The failing entry, or the whole text.
  */
 function patternInvalidEntry(text) {
-    for (const part of String(text).split(",")) {
+    for (const part of expandGradient(text).split(",")) {
         const match = part.trim().match(/^(?:(\d+)\s*%?\s*)?([a-z_][a-z0-9_:]*)$/i);
         if (!match || !resolveBlockId(match[2])) {
             return part.trim();
@@ -171,4 +208,4 @@ function shortName(id) {
     return colon === -1 ? id : id.slice(colon + 1);
 }
 
-export { DIRECTIONS, AIR_ID, NO_SELECTION_MESSAGE, resolveBlockId, parsePattern, patternErrorMessage, directionOrView, blockUnder, busyGuard, requireRegion, shortName };
+export { DIRECTIONS, AIR_ID, NO_SELECTION_MESSAGE, resolveBlockId, parsePattern, patternErrorMessage, setGradientResolver, setPatternPlayer, directionOrView, blockUnder, busyGuard, requireRegion, shortName };
