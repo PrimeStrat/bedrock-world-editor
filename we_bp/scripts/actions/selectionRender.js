@@ -3,8 +3,9 @@ import { getSelection, getPolygon } from "../session.js";
 import { spawnMarker } from "./marker.js";
 
 const RENDER_TICKS = 600;
-const REDRAW_INTERVAL_TICKS = 10;
-const MAX_EDGE_MARKERS = 400;
+const REDRAW_INTERVAL_TICKS = 20;
+const MAX_EDGE_STEPS = 8;
+const MAX_EDGE_MARKERS = 160;
 
 const renders = new Map();
 
@@ -14,7 +15,9 @@ const renders = new Map();
 
 /**
  * Samples evenly spaced points along a straight edge between two block corners,
- * inclusive, capped so long edges do not flood particles.
+ * inclusive. Short edges get a marker per block (a full outline); long edges
+ * cap at a few steps so a large selection reads as a sparse grid of corner and
+ * midpoint markers instead of solid particle lines.
  * @param {Vec3} a The edge start corner.
  * @param {Vec3} b The edge end corner.
  * @param {Vec3[]} out The accumulator to push points into.
@@ -25,7 +28,7 @@ function edgePoints(a, b, out) {
     const dy = b.y - a.y;
     const dz = b.z - a.z;
     const length = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz));
-    const steps = Math.max(1, Math.min(length, 32));
+    const steps = Math.max(1, Math.min(length, MAX_EDGE_STEPS));
     for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         out.push({ x: Math.round(a.x + dx * t), y: Math.round(a.y + dy * t), z: Math.round(a.z + dz * t) });
