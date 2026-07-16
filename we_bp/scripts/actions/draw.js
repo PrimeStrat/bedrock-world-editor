@@ -2,6 +2,7 @@ import { system, Player } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { spawnMarker, spawnMarkers } from "./marker.js";
 import { setPolygon } from "../session.js";
+import { renderSelection } from "./selectionRender.js";
 
 const SAMPLE_INTERVAL_TICKS = 3;
 const MAX_POINTS = 512;
@@ -147,6 +148,7 @@ function finishTrace(player) {
         return;
     }
     setPolygon(player.name, state.points);
+    renderSelection(player);
     player.sendMessage("§aPolygon selection set from " + state.points.length + " traced points. Fills confine to its shape.");
 }
 

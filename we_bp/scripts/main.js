@@ -53,6 +53,7 @@ world.beforeEvents.playerBreakBlock.subscribe(ev => {
     setPos1(player.name, loc);
     system.run(() => {
         player.sendMessage("§aPos1 set to §f" + loc.x + " " + loc.y + " " + loc.z + "§a." + selectionSizeSuffix(player.name));
+        renderSelection(player);
     });
 });
 
@@ -98,5 +99,6 @@ world.beforeEvents.playerInteractWithBlock.subscribe(ev => {
     setPos2(player.name, loc);
     system.run(() => {
         player.sendMessage("§aPos2 set to §f" + loc.x + " " + loc.y + " " + loc.z + "§a." + selectionSizeSuffix(player.name));
+        renderSelection(player);
     });
 });

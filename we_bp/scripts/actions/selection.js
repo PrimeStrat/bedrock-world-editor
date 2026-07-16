@@ -2,6 +2,17 @@ import { system, ItemStack, Player } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { getSelection, setPos1, setPos2, clearSelection } from "../session.js";
 import { DIRECTIONS, NO_SELECTION_MESSAGE, directionOrView, blockUnder } from "./common.js";
+import { renderSelection } from "./selectionRender.js";
+
+/**
+ * Shows the selection outline particles for a player next tick, cancelling any
+ * previous render. Safe to call from a read-only command context.
+ * @param {Player} player The acting player.
+ * @returns {void}
+ */
+function showSelection(player) {
+    system.run(() => renderSelection(player));
+}
 
 /**
  * @typedef {{x: number, y: number, z: number}} Vec3
@@ -38,6 +49,7 @@ function setPositionHere(player, which) {
     } else {
         setPos2(player.name, loc);
     }
+    showSelection(player);
     return { ok: true, message: "§aPos" + which + " set to §f" + loc.x + " " + loc.y + " " + loc.z + "§a." + selectionSizeSuffix(player.name) };
 }
 
@@ -63,6 +75,7 @@ function giveWand(player) {
  */
 function deselect(player) {
     clearSelection(player.name);
+    showSelection(player);
     return { ok: true, message: "§aSelection cleared." };
 }
 
@@ -113,6 +126,7 @@ function adjustSelection(player, amount, directionName, inward) {
     }
     setPos1(player.name, min);
     setPos2(player.name, max);
+    showSelection(player);
     return { ok: true, message: "§aSelection " + (inward ? "contracted" : "expanded") + " §f" + n + "§a block(s)." };
 }
 
@@ -157,6 +171,7 @@ function shiftSelection(player, amount, directionName) {
     const n = Math.max(1, Math.floor(amount));
     setPos1(player.name, { x: pos1.x + dir.x * n, y: pos1.y + dir.y * n, z: pos1.z + dir.z * n });
     setPos2(player.name, { x: pos2.x + dir.x * n, y: pos2.y + dir.y * n, z: pos2.z + dir.z * n });
+    showSelection(player);
     return { ok: true, message: "§aSelection shifted §f" + n + "§a block(s)." };
 }
 
@@ -183,6 +198,7 @@ function outsetSelection(player, amount, inward) {
     }
     setPos1(player.name, min);
     setPos2(player.name, max);
+    showSelection(player);
     return { ok: true, message: "§aSelection " + (inward ? "inset" : "outset") + "." };
 }
 
