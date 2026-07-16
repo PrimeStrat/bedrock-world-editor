@@ -2,7 +2,7 @@ import { world, system, Player } from "@minecraft/server";
 import { getSelection, getPolygon } from "../session.js";
 import { spawnMarker } from "./marker.js";
 
-const RENDER_TICKS = 60;
+const RENDER_TICKS = 600;
 const REDRAW_INTERVAL_TICKS = 10;
 const MAX_EDGE_MARKERS = 400;
 
