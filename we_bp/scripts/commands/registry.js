@@ -59,6 +59,7 @@ import { clearBrushCommand } from "./clearbrush.js";
 import { brushesCommand } from "./brushes.js";
 import { floodFillCommand } from "./floodfill.js";
 import { bookCommand } from "./book.js";
+import { pathCommand } from "./path.js";
 import { posCommand } from "./pos.js";
 
 const COMMANDS = [
@@ -139,6 +140,7 @@ const COMMANDS = [
     brushesCommand,
     floodFillCommand,
     bookCommand,
+    pathCommand,
     posCommand
 ];
 
@@ -160,6 +162,7 @@ function registerCommands(registry) {
     registry.registerEnum("we:terrainop", ["raise", "lower", "flatten", "smooth", "extrude", "roughen", "distort"]);
     registry.registerEnum("we:smoothmode", ["stable", "melt", "grow"]);
     registry.registerEnum("we:pathcurve", ["line", "arch", "catenary", "bezier"]);
+    registry.registerEnum("we:pathaction", ["add", "build", "paste", "clear", "list"]);
     registry.registerEnum("we:pathshape", ["deck", "tube"]);
     for (const command of COMMANDS) {
         registry.registerCommand(command.definition, command.handler);
