@@ -3,6 +3,7 @@ import { pasteRegion } from "./operations/paste.js";
 
 const TILE = 64;
 const MAX_HEIGHT = 384;
+const MAX_PATH_STAMPS = 100;
 
 /**
  * @typedef {{x: number, y: number, z: number}} Vec3
@@ -266,6 +267,80 @@ function pasteClipboard(player, skipAir) {
 }
 
 /**
+ * Stamps the player's clipboard repeatedly along a sampled path, each stamp
+ * centered on the path and rotated in 90-degree steps to follow the path's
+ * direction, so a straight segment built along +X curves around bends. Stamps
+ * are spaced by arc length and the whole run records as one undoable edit.
+ * @param {Player} player The stamping player.
+ * @param {Vec3[]} samples The path samples, in order (fractional positions).
+ * @param {number|undefined} spacing Blocks between stamps, or undefined for the
+ *   clipboard's X length so segments butt end to end.
+ * @param {boolean} skipAir When true, air in the clipboard does not overwrite.
+ * @returns {{ok: boolean, message: string}} The result and a status message.
+ */
+function stampClipboardAlongPath(player, samples, spacing, skipAir) {
+    const clip = clipboards.get(player.name);
+    if (!clip || clip.tiles.length === 0) {
+        return { ok: false, message: "Clipboard is empty. Use /we:copy first." };
+    }
+    const baseQuarters = quartersFor(clip.rotation);
+    const step = Math.max(1, Math.floor(spacing ?? clip.size.x));
+    const range = player.dimension.heightRange;
+    const stamps = [];
+    let acc = step;
+    for (let i = 0; i < samples.length && stamps.length < MAX_PATH_STAMPS; i++) {
+        if (i > 0) {
+            const dx = samples[i].x - samples[i - 1].x;
+            const dy = samples[i].y - samples[i - 1].y;
+            const dz = samples[i].z - samples[i - 1].z;
+            acc += Math.sqrt(dx * dx + dy * dy + dz * dz);
+        }
+        if (acc < step) {
+            continue;
+        }
+        acc = 0;
+        const ahead = samples[Math.min(samples.length - 1, i + 1)];
+        const behind = samples[Math.max(0, i - 1)];
+        const angle = Math.atan2(ahead.z - behind.z, ahead.x - behind.x) * 180 / Math.PI;
+        const quarters = (baseQuarters + ((Math.round(angle / 90) % 4) + 4) % 4) % 4;
+        const rotSize = rotatedSize(clip.size, quarters);
+        const targetMin = {
+            x: Math.round(samples[i].x) - Math.floor(rotSize.x / 2),
+            y: Math.max(range.min, Math.min(range.max - rotSize.y, Math.round(samples[i].y))),
+            z: Math.round(samples[i].z) - Math.floor(rotSize.z / 2)
+        };
+        stamps.push({ targetMin, quarters, rotSize });
+    }
+    if (stamps.length === 0) {
+        return { ok: false, message: "Path too short for a stamp." };
+    }
+    const regionMin = { x: Infinity, y: Infinity, z: Infinity };
+    const regionMax = { x: -Infinity, y: -Infinity, z: -Infinity };
+    for (const stamp of stamps) {
+        regionMin.x = Math.min(regionMin.x, stamp.targetMin.x);
+        regionMin.y = Math.min(regionMin.y, stamp.targetMin.y);
+        regionMin.z = Math.min(regionMin.z, stamp.targetMin.z);
+        regionMax.x = Math.max(regionMax.x, stamp.targetMin.x + stamp.rotSize.x - 1);
+        regionMax.y = Math.max(regionMax.y, stamp.targetMin.y + stamp.rotSize.y - 1);
+        regionMax.z = Math.max(regionMax.z, stamp.targetMin.z + stamp.rotSize.z - 1);
+    }
+    const dimension = player.dimension;
+    const mirror = mirrorFor(clip.flipX, clip.flipZ);
+    const placeFn = function* () {
+        for (const stamp of stamps) {
+            for (const tile of clip.tiles) {
+                const o = transformedTileOrigin(tile, clip.size, stamp.quarters, clip.flipX, clip.flipZ);
+                const location = { x: stamp.targetMin.x + o.x, y: stamp.targetMin.y + tile.oy, z: stamp.targetMin.z + o.z };
+                world.structureManager.place(tile.structureId, dimension, location, { rotation: rotationFor(stamp.quarters), mirror, includeEntities: false });
+                yield;
+            }
+        }
+    };
+    pasteRegion(player, dimension, regionMin, regionMax, placeFn, "Path paste", Boolean(skipAir));
+    return { ok: true, message: "Stamping " + stamps.length + " cop(ies) along the path..." };
+}
+
+/**
  * Returns the dominant horizontal unit axis from a view direction.
  * @param {Vec3} view The player's view direction.
  * @returns {Vec3} A unit vector along the dominant horizontal axis.
@@ -407,4 +482,4 @@ function clearClipboardForPlayer(player) {
         : { ok: false, message: "Clipboard was already empty." };
 }
 
-export { copySelection, pasteClipboard, rotateClipboard, flipClipboard, clearClipboardForPlayer, stackSelection, axisFromView };
+export { copySelection, pasteClipboard, rotateClipboard, flipClipboard, clearClipboardForPlayer, stackSelection, stampClipboardAlongPath, axisFromView };
