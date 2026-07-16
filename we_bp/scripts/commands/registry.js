@@ -45,20 +45,18 @@ import { thruCommand } from "./thru.js";
 import { jumpToCommand } from "./jumpto.js";
 import { menuCommand } from "./menu.js";
 import { debugCommand } from "./debug.js";
-import { brushCommand, ebrushCommand } from "./brush.js";
+import { brushCommand } from "./brush.js";
 import { generateCommand } from "./generate.js";
 import { cancelCommand } from "./cancel.js";
 import { centerCommand } from "./center.js";
 import { symmetryCommand } from "./symmetry.js";
-import { paintCommand, epaintCommand, eraseCommand } from "./paint.js";
 import { gradientCommand } from "./gradient.js";
 import { bridgeCommand, ebridgeCommand } from "./bridge.js";
 import { terrainCommand } from "./terrain.js";
 import { drawCommand } from "./draw.js";
 import { smoothCommand } from "./smooth.js";
-import { loopBrushCommand } from "./loopbrush.js";
-import { clearBindCommand } from "./clearbind.js";
-import { bindCommand } from "./bind.js";
+import { setBrushCommand } from "./setbrush.js";
+import { clearBrushCommand } from "./clearbrush.js";
 import { posCommand } from "./pos.js";
 
 const COMMANDS = [
@@ -124,23 +122,18 @@ const COMMANDS = [
     menuCommand,
     debugCommand,
     brushCommand,
-    ebrushCommand,
     generateCommand,
     cancelCommand,
     centerCommand,
     symmetryCommand,
-    paintCommand,
-    epaintCommand,
-    eraseCommand,
     gradientCommand,
     bridgeCommand,
     ebridgeCommand,
     terrainCommand,
     drawCommand,
     smoothCommand,
-    loopBrushCommand,
-    clearBindCommand,
-    bindCommand,
+    setBrushCommand,
+    clearBrushCommand,
     posCommand
 ];
 
@@ -153,6 +146,7 @@ function registerCommands(registry) {
     registry.registerEnum("we:direction", Object.keys(DIRECTIONS));
     registry.registerEnum("we:axis", ["x", "z"]);
     registry.registerEnum("we:brushshape", ["sphere", "cylinder", "hsphere", "hcylinder", "none"]);
+    registry.registerEnum("we:brushtype", ["sculpt", "paint", "erase", "gradient"]);
     registry.registerEnum("we:symmetryaction", ["set", "flip", "rotate", "radial", "status", "clear"]);
     registry.registerEnum("we:flipaxis", ["x", "y", "z"]);
     registry.registerEnum("we:gradientaction", ["start", "stop", "delete", "list"]);

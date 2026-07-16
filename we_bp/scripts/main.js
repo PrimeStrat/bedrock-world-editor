@@ -3,7 +3,7 @@ import { registerCommands } from "./commands/registry.js";
 import { clearWorldEditStructures } from "./operations/undo.js";
 import { setPos1, setPos2 } from "./session.js";
 import { WE_CONFIG } from "./config.js";
-import { applyToolClick } from "./actions/brush.js";
+import { beginStroke, endStroke } from "./actions/tools.js";
 import { mirrorPlacement, mirrorBreak } from "./actions/symmetry.js";
 import { isDrawMode, toggleTrace } from "./actions/draw.js";
 import { selectionSizeSuffix } from "./actions/selection.js";
@@ -55,13 +55,21 @@ world.beforeEvents.playerBreakBlock.subscribe(ev => {
 world.afterEvents.itemUse.subscribe(ev => {
     const player = ev.source;
     if (player.getGameMode() !== GameMode.Creative) return;
-    if (isWandUse(player, ev.itemStack)) {
-        if (isDrawMode(player.name)) {
-            toggleTrace(player);
-        }
-        return;
+    if (isWandUse(player, ev.itemStack) && isDrawMode(player.name)) {
+        toggleTrace(player);
     }
-    applyToolClick(player, ev.itemStack);
+});
+
+world.afterEvents.itemStartUse.subscribe(ev => {
+    beginStroke(ev.source, ev.itemStack.typeId);
+});
+
+world.afterEvents.itemStopUse.subscribe(ev => {
+    endStroke(ev.source.name);
+});
+
+world.afterEvents.itemReleaseUse.subscribe(ev => {
+    endStroke(ev.source.name);
 });
 
 world.afterEvents.playerPlaceBlock.subscribe(ev => {

@@ -2,7 +2,7 @@ import { system, Player } from "@minecraft/server";
 import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
 import { getHistory } from "../session.js";
 import { showChestMenu } from "./chest.js";
-import { promptBlock, promptTwoBlocks, promptAmount, promptShape, promptBrush, promptGenerate, promptRadius, promptRotation, promptFlipAxis } from "./prompts.js";
+import { promptBlock, promptTwoBlocks, promptAmount, promptShape, promptGenerate, promptRadius, promptRotation, promptFlipAxis } from "./prompts.js";
 import { setPositionHere, giveWand, deselect, selectionInfo, expandSelection, contractSelection, shiftSelection, outsetSelection } from "../actions/selection.js";
 import { setBlocks, replaceBlocks, buildSelectionShell, hollowSelection, overlaySelection, countBlocks, moveRegion } from "../actions/region.js";
 import { copyRegion, cutRegion, pasteRegionAction, stackRegion, rotateAction, flipAction, clearClipboardAction } from "../actions/clipboard.js";
@@ -10,7 +10,7 @@ import { buildSphere, buildCylinder, buildPyramid, generateShape } from "../acti
 import { removeNear, drainNear, replaceNear } from "../actions/utility.js";
 import { undoEdit, redoEdit, massUndo, massRedo, clearEditHistory } from "../actions/history.js";
 import { goUp, unstuck, ascendDescend, goThru, jumpTo, goCeil } from "../actions/navigation.js";
-import { bindBrush, unbindBrush, toolEntries, configEntries, bindConfig, bindGradient, saveConfig } from "../actions/brush.js";
+import { saveBrushPreset, deleteBrushPreset, setBrush, clearBrush, brushEntries, setTerrain } from "../actions/tools.js";
 import { gradientEntries } from "../actions/gradient.js";
 
 /**
@@ -36,11 +36,11 @@ async function openMainMenu(player) {
         { slot: 3, icon: "textures/items/diamond_pickaxe", hover: "§e§lRegion§r\n§7Set, replace, walls, move...", menu: true, run: (p) => openRegionMenu(p) },
         { slot: 4, icon: "textures/items/brick", hover: "§e§lGeneration§r\n§7Spheres, cylinders, pyramids", menu: true, run: (p) => openGenerationMenu(p) },
         { slot: 5, icon: "textures/items/paper", hover: "§e§lClipboard§r\n§7Copy, cut, paste, rotate...", menu: true, run: (p) => openClipboardMenu(p) },
-        { slot: 6, icon: "textures/items/stick", hover: "§e§lBrushes§r\n§7Bind shapes to held items", menu: true, run: (p) => openBrushMenu(p) },
+        { slot: 6, icon: "textures/items/stick", hover: "§e§lBrushes§r\n§7World Brush + Terrain Builder", menu: true, run: (p) => openBrushMenu(p) },
         { slot: 11, icon: "textures/items/bucket_water", hover: "§e§lUtility§r\n§7Remove near, drain...", menu: true, run: (p) => openUtilityMenu(p) },
         { slot: 12, icon: "textures/items/ender_pearl", hover: "§e§lNavigation§r\n§7Up, jump to, through walls...", menu: true, run: (p) => openNavigationMenu(p) },
         { slot: 13, icon: "textures/items/book_writable", hover: "§e§lHistory§r\n§7Edit list, undo, redo", menu: true, run: (p) => openHistoryMenu(p, 0) },
-        { slot: 14, icon: "textures/items/nether_star", hover: "§e§lBind§r\n§7Gradients and brush configs", menu: true, run: (p) => openBindMenu(p) }
+        { slot: 14, icon: "textures/items/nether_star", hover: "§e§lSet Brush§r\n§7Equip a saved brush preset", menu: true, run: (p) => openSetBrushMenu(p) }
     ]);
 }
 
@@ -315,51 +315,138 @@ async function openNavigationMenu(player) {
     ]);
 }
 
+const BRUSH_TYPES = ["sculpt", "paint", "erase", "gradient"];
+
 /**
- * Opens the brush chest menu.
+ * Opens the brushes chest menu: create World Brush presets, set the Terrain
+ * Builder, equip a saved brush, and view saved brushes and gradients.
  * @param {Player} player The player to show to.
  * @returns {Promise<void>} Resolves when the menu closes.
  */
 async function openBrushMenu(player) {
     await showChestMenu(player, "§8Brushes", [
         {
-            slot: 11, icon: "textures/items/snowball", hover: "§e§lSphere Brush...§r\n§7Bind to a tool", run: async (p) => {
-                const input = await promptBrush(p, "Sphere Brush", false);
+            slot: 10, icon: "textures/items/snowball", hover: "§e§lNew Brush...§r\n§7Save+equip a World Brush preset", run: async (p) => {
+                const input = await promptNewBrush(p);
                 if (input) {
-                    report(p, bindBrush(p, "sphere", input.blockText, input.radius, 1, input.hollow, input.includeAir, input.itemText));
+                    report(p, saveBrushPreset(p, input.name, input.brushType, input.shape, input.blockText, input.radius, input.height, input.hollow));
                 }
             }
         },
+        { slot: 12, icon: "textures/items/nether_star", hover: "§e§lSet Brush§r\n§7Equip a saved brush preset", menu: true, run: (p) => openSetBrushMenu(p) },
+        { slot: 13, icon: "textures/items/bucket_empty", hover: "§e§lClear Brush§r\n§7Unequip the World Brush", run: (p) => report(p, clearBrush(p)) },
         {
-            slot: 13, icon: "textures/items/blaze_rod", hover: "§e§lCylinder Brush...§r\n§7Bind to a tool", run: async (p) => {
-                const input = await promptBrush(p, "Cylinder Brush", true);
+            slot: 15, icon: "textures/items/grass", hover: "§e§lTerrain Builder...§r\n§7Set raise/lower/flatten/smooth", run: async (p) => {
+                const input = await promptTerrain(p);
                 if (input) {
-                    report(p, bindBrush(p, "cylinder", input.blockText, input.radius, input.height, input.hollow, input.includeAir, input.itemText));
+                    report(p, setTerrain(p, input.mode, input.radius, input.strength));
                 }
             }
         },
-        { slot: 15, icon: "textures/items/bucket_empty", hover: "§e§lUnbind§r\n§7Remove the brush from your held tool", run: (p) => report(p, unbindBrush(p)) },
-        { slot: 16, icon: "textures/items/book_normal", hover: "§e§lSaved Items§r\n§7View bound tools and gradients", menu: true, run: (p) => openSavedItemsForm(p) },
+        { slot: 16, icon: "textures/items/book_normal", hover: "§e§lSaved Items§r\n§7View saved brushes and gradients", menu: true, run: (p) => openSavedItemsForm(p) },
         { slot: 26, icon: "textures/items/dye_powder_red", hover: "§c§lBack", menu: true, run: (p) => openMainMenu(p) }
     ]);
 }
 
 /**
- * Opens a read-only form listing the player's bound tools and saved gradients
- * with their contents.
+ * Prompts for a new brush preset: name, type, shape, block/gradient, radius,
+ * height, and hollow.
+ * @param {Player} player The player to prompt.
+ * @returns {Promise<{name: string, brushType: string, shape: string, blockText: string, radius: number, height: number, hollow: boolean}|null>} The inputs, or null.
+ */
+async function promptNewBrush(player) {
+    const form = new ModalFormData().title("New Brush")
+        .textField("Name", "hills")
+        .dropdown("Type", ["Sculpt (fill shape)", "Paint (surface)", "Erase", "Gradient (surface)"], { defaultValueIndex: 0 })
+        .dropdown("Shape", ["Sphere", "Cylinder", "Hollow sphere", "Hollow cylinder"], { defaultValueIndex: 0 })
+        .textField("Block/pattern (or #gradient for gradient type)", "stone")
+        .slider("Radius", 1, 5, { valueStep: 1, defaultValue: 3 })
+        .slider("Cylinder height", 1, 16, { valueStep: 1, defaultValue: 4 });
+    const res = await form.show(player);
+    if (res.canceled || !res.formValues) {
+        return null;
+    }
+    const v = res.formValues;
+    const shapes = ["sphere", "cylinder", "hsphere", "hcylinder"];
+    const shapeChoice = shapes[Number(v[2])];
+    const shape = shapeChoice === "cylinder" || shapeChoice === "hcylinder" ? "cylinder" : "sphere";
+    const hollow = shapeChoice === "hsphere" || shapeChoice === "hcylinder";
+    return { name: String(v[0]), brushType: BRUSH_TYPES[Number(v[1])], shape, blockText: String(v[3]), radius: Number(v[4]), height: Number(v[5]), hollow };
+}
+
+/**
+ * Prompts for a terrain builder mode, radius, and strength.
+ * @param {Player} player The player to prompt.
+ * @returns {Promise<{mode: string, radius: number, strength: number}|null>} The inputs, or null.
+ */
+async function promptTerrain(player) {
+    const form = new ModalFormData().title("Terrain Builder")
+        .dropdown("Mode", ["Raise", "Lower", "Flatten", "Smooth"], { defaultValueIndex: 0 })
+        .slider("Radius", 1, 5, { valueStep: 1, defaultValue: 4 })
+        .slider("Strength", 1, 8, { valueStep: 1, defaultValue: 2 });
+    const res = await form.show(player);
+    if (res.canceled || !res.formValues) {
+        return null;
+    }
+    const modes = ["raise", "lower", "flatten", "smooth"];
+    return { mode: modes[Number(res.formValues[0])], radius: Number(res.formValues[1]), strength: Number(res.formValues[2]) };
+}
+
+/**
+ * Opens the set-brush chest menu: lists saved brush presets to equip on the
+ * World Brush, marking the currently equipped one.
+ * @param {Player} player The player to show to.
+ * @returns {Promise<void>} Resolves when the menu closes.
+ */
+async function openSetBrushMenu(player) {
+    const presets = brushEntries(player);
+    const entries = [];
+    let slot = 0;
+    for (const preset of presets) {
+        const marker = preset.equipped ? "§a[equipped] " : "";
+        entries.push({
+            slot, icon: preset.equipped ? "textures/items/dye_powder_green" : "textures/items/diamond_pickaxe",
+            hover: "§e§l" + preset.name + "§r\n§7" + preset.detail + "\n" + marker + "§eClick to equip", menu: true, run: (p) => {
+                report(p, setBrush(p, preset.name));
+                return openSetBrushMenu(p);
+            }
+        });
+        slot += 1;
+    }
+    if (presets.length === 0) {
+        entries.push({ slot: 4, icon: "textures/items/book_normal", hover: "§7No brushes saved.\n§7Make one with New Brush.", menu: true, run: (p) => openBrushMenu(p) });
+    } else {
+        entries.push({
+            slot: 25, icon: "textures/items/flint_and_steel", hover: "§e§lDelete Brush...§r\n§7Remove a saved preset", menu: true, run: async (p) => {
+                const names = brushEntries(p).map((e) => e.name);
+                const form = new ModalFormData().title("Delete Brush").dropdown("Brush", names, { defaultValueIndex: 0 });
+                const res = await form.show(p);
+                if (!res.canceled && res.formValues) {
+                    report(p, deleteBrushPreset(p, names[Number(res.formValues[0])]));
+                }
+                return openSetBrushMenu(p);
+            }
+        });
+    }
+    entries.push({ slot: 26, icon: "textures/items/dye_powder_red", hover: "§c§lBack", menu: true, run: (p) => openBrushMenu(p) });
+    await showChestMenu(player, "§8Set Brush", entries);
+}
+
+/**
+ * Opens a read-only form listing the player's saved brushes and gradients.
  * @param {Player} player The player to show to.
  * @returns {Promise<void>} Resolves when the form closes.
  */
 async function openSavedItemsForm(player) {
-    const tools = toolEntries(player);
+    const presets = brushEntries(player);
     const gradients = gradientEntries(player);
     const lines = [];
-    lines.push("§6Bound Tools");
-    if (tools.length === 0) {
+    lines.push("§6Saved Brushes");
+    if (presets.length === 0) {
         lines.push("§7  none");
     } else {
-        for (const tool of tools) {
-            lines.push("§f  " + tool.item + " §7- §e" + tool.kind + " §7(" + tool.detail + ")");
+        for (const preset of presets) {
+            lines.push("§f  " + preset.name + " §7- " + preset.detail + (preset.equipped ? " §a(equipped)" : ""));
         }
     }
     lines.push("");
@@ -368,7 +455,7 @@ async function openSavedItemsForm(player) {
         lines.push("§7  none");
     } else {
         for (const grad of gradients) {
-            lines.push("§f  #" + grad.name + " §7- §b" + grad.pattern);
+            lines.push("§f  #" + grad.name + " §7- §b" + grad.label);
         }
     }
     const form = new ActionFormData().title("§8Saved Items").body(lines.join("\n")).button("§cClose");
@@ -466,52 +553,4 @@ async function openHistoryMenu(player, page) {
     await showChestMenu(player, "§8History " + (current + 1) + "/" + pages, entries);
 }
 
-/**
- * Opens the bind chest menu: lists saved gradients and brush configs to bind
- * to the held tool, plus an option to save the held tool as a config.
- * @param {Player} player The player to show to.
- * @returns {Promise<void>} Resolves when the menu closes.
- */
-async function openBindMenu(player) {
-    const gradients = gradientEntries(player);
-    const configs = configEntries(player);
-    const entries = [];
-    let slot = 0;
-    for (const grad of gradients) {
-        entries.push({
-            slot, icon: "textures/items/dye_powder_green", hover: "§a§l#" + grad.name + "§r\n§7" + grad.label + "\n§eBind gradient to held tool", run: async (p) => {
-                const form = new ModalFormData().title("Bind #" + grad.name)
-                    .dropdown("Apply as", ["Brush (fill sphere)", "Paint (surface only)"], { defaultValueIndex: 0 })
-                    .slider("Radius", 1, 5, { valueStep: 1, defaultValue: 3 });
-                const res = await form.show(p);
-                if (!res.canceled && res.formValues) {
-                    const mode = Number(res.formValues[0]) === 1 ? "paint" : "brush";
-                    report(p, bindGradient(p, grad.name, Number(res.formValues[1]), mode));
-                }
-            }
-        });
-        slot += 1;
-    }
-    for (const cfg of configs) {
-        entries.push({
-            slot, icon: "textures/items/diamond_pickaxe", hover: "§e§l" + cfg.name + "§r\n§7" + cfg.detail + "\n§eBind config to held tool", run: (p) => report(p, bindConfig(p, cfg.name))
-        });
-        slot += 1;
-    }
-    if (entries.length === 0) {
-        entries.push({ slot: 4, icon: "textures/items/book_normal", hover: "§7Nothing saved.\n§7Make a gradient or save a tool.", menu: true, run: (p) => openBindMenu(p) });
-    }
-    entries.push({
-        slot: 22, icon: "textures/items/nether_star", hover: "§e§lSave Held Tool§r\n§7Save your held tool as a config", run: async (p) => {
-            const form = new ModalFormData().title("Save Brush Config").textField("Config name", "mybrush");
-            const res = await form.show(p);
-            if (!res.canceled && res.formValues) {
-                report(p, saveConfig(p, String(res.formValues[0])));
-            }
-        }
-    });
-    entries.push({ slot: 26, icon: "textures/items/dye_powder_red", hover: "§c§lBack", menu: true, run: (p) => openMainMenu(p) });
-    await showChestMenu(player, "§8Bind", entries);
-}
-
-export { openMainMenu, openHistoryMenu, openBindMenu };
+export { openMainMenu, openHistoryMenu, openSetBrushMenu };

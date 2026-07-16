@@ -106,7 +106,7 @@ function stopGradient(player) {
     const map = loadGradients(player);
     map[key] = scan.bands;
     storeGradients(player, map);
-    return { ok: true, message: "§aGradient §f#" + key + "§a locked in: §b" + scan.label + "§a. Bind it with /we:bind." };
+    return { ok: true, message: "§aGradient §f#" + key + "§a locked in: §b" + scan.label + "§a. Use it with /we:brush <name> gradient sphere #" + key + "§a." };
 }
 
 /**

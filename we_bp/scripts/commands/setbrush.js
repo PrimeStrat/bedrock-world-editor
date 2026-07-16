@@ -1,11 +1,11 @@
 import { system, CommandPermissionLevel, CustomCommandStatus } from "@minecraft/server";
 import { getPlayer, notPlayer } from "./common.js";
-import { openBindMenu } from "../menu/mainMenu.js";
+import { openSetBrushMenu } from "../menu/mainMenu.js";
 
-const bindCommand = {
+const setBrushCommand = {
     definition: {
-        name: "we:bind",
-        description: "Open the bind menu for gradients and brush configs.",
+        name: "we:setbrush",
+        description: "Open a menu to equip a saved brush on the World Brush.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false
     },
@@ -15,10 +15,10 @@ const bindCommand = {
             return notPlayer();
         }
         system.run(() => {
-            openBindMenu(player);
+            openSetBrushMenu(player);
         });
         return { status: CustomCommandStatus.Success };
     }
 };
 
-export { bindCommand };
+export { setBrushCommand };

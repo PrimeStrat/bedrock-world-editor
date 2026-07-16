@@ -1,11 +1,11 @@
 import { CommandPermissionLevel } from "@minecraft/server";
 import { getPlayer, toCommandResult, notPlayer } from "./common.js";
-import { clearAllTools } from "../actions/brush.js";
+import { clearBrush } from "../actions/tools.js";
 
-const clearBindCommand = {
+const clearBrushCommand = {
     definition: {
-        name: "we:clearbind",
-        description: "Clear all brushes, paints, and terrain tools from items.",
+        name: "we:clearbrush",
+        description: "Clear the brush equipped on the World Brush item.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false
     },
@@ -14,8 +14,8 @@ const clearBindCommand = {
         if (!player) {
             return notPlayer();
         }
-        return toCommandResult(clearAllTools(player));
+        return toCommandResult(clearBrush(player));
     }
 };
 
-export { clearBindCommand };
+export { clearBrushCommand };

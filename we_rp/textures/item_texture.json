@@ -1,0 +1,8 @@
+{
+    "resource_pack_name": "we",
+    "texture_name": "atlas.items",
+    "texture_data": {
+        "we_brush": { "textures": "textures/items/we_brush" },
+        "we_terrain": { "textures": "textures/items/we_terrain" }
+    }
+}
