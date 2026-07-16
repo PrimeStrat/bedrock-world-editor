@@ -14,21 +14,32 @@ const renders = new Map();
  */
 
 /**
- * Samples evenly spaced points along a straight edge between two block corners,
- * inclusive. Short edges get a marker per block (a full outline); long edges
- * cap at a few steps so a large selection reads as a sparse grid of corner and
- * midpoint markers instead of solid particle lines.
+ * Returns the block length of a straight edge between two corners.
  * @param {Vec3} a The edge start corner.
  * @param {Vec3} b The edge end corner.
+ * @returns {number} The dominant-axis length.
+ */
+function edgeLength(a, b) {
+    return Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y), Math.abs(b.z - a.z));
+}
+
+/**
+ * Samples points along a straight edge between two block corners, inclusive.
+ * In per-block mode every block along the edge gets one point (a full outline,
+ * markers centered on each block); otherwise the edge caps at a few steps so a
+ * large selection reads as a sparse grid instead of solid particle lines.
+ * @param {Vec3} a The edge start corner.
+ * @param {Vec3} b The edge end corner.
+ * @param {boolean} perBlock When true, sample one point per block.
  * @param {Vec3[]} out The accumulator to push points into.
  * @returns {void}
  */
-function edgePoints(a, b, out) {
+function edgePoints(a, b, perBlock, out) {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const dz = b.z - a.z;
-    const length = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz));
-    const steps = Math.max(1, Math.min(length, MAX_EDGE_STEPS));
+    const length = edgeLength(a, b);
+    const steps = Math.max(1, perBlock ? length : Math.min(length, MAX_EDGE_STEPS));
     for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         out.push({ x: Math.round(a.x + dx * t), y: Math.round(a.y + dy * t), z: Math.round(a.z + dz * t) });
@@ -37,35 +48,53 @@ function edgePoints(a, b, out) {
 
 /**
  * Returns the outline points for a selection: the twelve edges of the bounding
- * box, plus the polygon prism edges when the selection is a polygon.
+ * box, plus the polygon prism edges when the selection is a polygon. When the
+ * whole outline fits the marker budget it is sampled one point per block
+ * (deduped, so each outline block gets exactly one centered particle);
+ * larger selections fall back to sparse grid sampling.
  * @param {Vec3} min The box min corner.
  * @param {Vec3} max The box max corner.
  * @param {Vec3[]|null} polygon The polygon vertices, or null.
  * @returns {Vec3[]} The outline points.
  */
 function outlinePoints(min, max, polygon) {
-    const points = [];
     const corners = [
         { x: min.x, y: min.y, z: min.z }, { x: max.x, y: min.y, z: min.z },
         { x: max.x, y: min.y, z: max.z }, { x: min.x, y: min.y, z: max.z },
         { x: min.x, y: max.y, z: min.z }, { x: max.x, y: max.y, z: min.z },
         { x: max.x, y: max.y, z: max.z }, { x: min.x, y: max.y, z: max.z }
     ];
-    const edges = [
+    const boxEdges = [
         [0, 1], [1, 2], [2, 3], [3, 0],
         [4, 5], [5, 6], [6, 7], [7, 4],
         [0, 4], [1, 5], [2, 6], [3, 7]
     ];
-    for (const [a, b] of edges) {
-        edgePoints(corners[a], corners[b], points);
-    }
+    const edges = boxEdges.map(([a, b]) => [corners[a], corners[b]]);
     if (polygon && polygon.length >= 3) {
         for (let i = 0; i < polygon.length; i++) {
             const a = polygon[i];
             const b = polygon[(i + 1) % polygon.length];
-            edgePoints({ x: a.x, y: min.y, z: a.z }, { x: b.x, y: min.y, z: b.z }, points);
-            edgePoints({ x: a.x, y: max.y, z: a.z }, { x: b.x, y: max.y, z: b.z }, points);
-            edgePoints({ x: a.x, y: min.y, z: a.z }, { x: a.x, y: max.y, z: a.z }, points);
+            edges.push([{ x: a.x, y: min.y, z: a.z }, { x: b.x, y: min.y, z: b.z }]);
+            edges.push([{ x: a.x, y: max.y, z: a.z }, { x: b.x, y: max.y, z: b.z }]);
+            edges.push([{ x: a.x, y: min.y, z: a.z }, { x: a.x, y: max.y, z: a.z }]);
+        }
+    }
+    let outlineBlocks = 0;
+    for (const [a, b] of edges) {
+        outlineBlocks += edgeLength(a, b) + 1;
+    }
+    const perBlock = outlineBlocks <= MAX_EDGE_MARKERS;
+    const sampled = [];
+    for (const [a, b] of edges) {
+        edgePoints(a, b, perBlock, sampled);
+    }
+    const seen = new Set();
+    const points = [];
+    for (const point of sampled) {
+        const key = point.x + "," + point.y + "," + point.z;
+        if (!seen.has(key)) {
+            seen.add(key);
+            points.push(point);
         }
     }
     return points.length > MAX_EDGE_MARKERS ? points.slice(0, MAX_EDGE_MARKERS) : points;
