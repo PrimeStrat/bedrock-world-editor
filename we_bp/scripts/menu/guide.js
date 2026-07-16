@@ -1,4 +1,4 @@
-import { Player } from "@minecraft/server";
+import { world, Player } from "@minecraft/server";
 import { ActionFormData } from "@minecraft/server-ui";
 
 /**
@@ -104,9 +104,13 @@ const SECTIONS = [
  * @returns {Promise<void>} Resolves when the guide closes.
  */
 async function openGuide(player) {
+    const fresh = world.getAllPlayers().find((p) => p.name === player.name);
+    if (fresh) {
+        fresh.playSound("random.pop");
+    }
     const form = new ActionFormData()
         .title("§dWorld Editor Guide")
-        .body("§7A world-building toolkit. Pick a category to see its commands.\n§8Two items drive the brushes: the §bWorld Brush§8 and the §aTerrain Builder§8 - hold right-click to use them.");
+        .body("§7A world-building toolkit. Pick a category to see its commands.\n§7Two items drive the brushes: the §bWorld Brush§7 and the §aTerrain Builder§7 - hold right-click to use them.");
     for (const section of SECTIONS) {
         form.button("§l" + section.title);
     }
@@ -129,7 +133,7 @@ async function openGuideSection(player, index) {
     const lines = [section.intro, ""];
     for (const entry of section.entries) {
         lines.push("§b" + entry.cmd);
-        lines.push("§7  " + entry.desc);
+        lines.push("§7- " + entry.desc);
     }
     const form = new ActionFormData()
         .title("§d" + section.title)
