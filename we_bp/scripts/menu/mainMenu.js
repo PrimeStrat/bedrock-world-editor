@@ -29,7 +29,7 @@ const BRUSH_TYPES = ["sculpt", "paint", "erase", "gradient", "noise"];
 async function openBrushMenu(player) {
     await showChestMenu(player, "§8Brushes", [
         {
-            slot: 10, icon: "textures/items/snowball", hover: "§e§lNew Brush...§r\n§7Save+equip a World Brush preset", run: async (p) => {
+            slot: 10, icon: "textures/items/we_brush", hover: "§e§lNew Brush...§r\n§7Save+equip a World Brush preset", run: async (p) => {
                 const input = await promptNewBrush(p);
                 if (input) {
                     report(p, saveBrushPreset(p, input.name, input.brushType, input.shape, input.blockText, input.radius, input.height, input.hollow));
@@ -39,7 +39,7 @@ async function openBrushMenu(player) {
         { slot: 12, icon: "textures/items/nether_star", hover: "§e§lSet Brush§r\n§7Equip a saved brush preset", menu: true, run: (p) => openSetBrushMenu(p) },
         { slot: 13, icon: "textures/items/bucket_empty", hover: "§e§lClear Brush§r\n§7Unequip the World Brush", run: (p) => report(p, clearBrush(p)) },
         {
-            slot: 15, icon: "textures/items/grass", hover: "§e§lTerrain Builder...§r\n§7Set raise/lower/flatten/smooth", run: async (p) => {
+            slot: 15, icon: "textures/items/we_terrain", hover: "§e§lTerrain Builder...§r\n§7Set raise/lower/flatten/smooth", run: async (p) => {
                 const input = await promptTerrain(p);
                 if (input) {
                     report(p, setTerrain(p, input.mode, input.radius, input.strength));

@@ -56,6 +56,7 @@ import { drawCommand } from "./draw.js";
 import { smoothCommand } from "./smooth.js";
 import { setBrushCommand } from "./setbrush.js";
 import { clearBrushCommand } from "./clearbrush.js";
+import { brushesCommand } from "./brushes.js";
 import { floodFillCommand } from "./floodfill.js";
 import { bookCommand } from "./book.js";
 import { posCommand } from "./pos.js";
@@ -134,6 +135,7 @@ const COMMANDS = [
     smoothCommand,
     setBrushCommand,
     clearBrushCommand,
+    brushesCommand,
     floodFillCommand,
     bookCommand,
     posCommand
