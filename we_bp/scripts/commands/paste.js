@@ -5,7 +5,7 @@ import { pasteRegionAction } from "../actions/clipboard.js";
 const pasteCommand = {
     definition: {
         name: "we:paste",
-        description: "Paste your clipboard at your location. Pass true to skip air.",
+        description: "Paste at the same offset you copied from. true=skip air.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false,
         optionalParameters: [{ type: CustomCommandParamType.Boolean, name: "skipAir" }]

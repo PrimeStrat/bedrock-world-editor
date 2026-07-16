@@ -5,7 +5,7 @@ import { setTerrain } from "../actions/tools.js";
 const terrainCommand = {
     definition: {
         name: "we:terrain",
-        description: "Set the Terrain Builder: raise, lower, flatten, smooth.",
+        description: "Set the Terrain Builder mode (raise, smooth, extrude...).",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false,
         mandatoryParameters: [{ type: CustomCommandParamType.Enum, name: "we:terrainop" }],

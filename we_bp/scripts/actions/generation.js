@@ -96,9 +96,10 @@ function buildCylinder(player, radius, height, blockText, hollow, includeAir, ba
 }
 
 /**
- * Builds a square pyramid based at the player's position.
+ * Builds a square pyramid based at the player's position. A negative size
+ * builds an inverted pyramid (apex down, widening upward).
  * @param {Player} player The acting player.
- * @param {number} size The pyramid height.
+ * @param {number} size The pyramid height; negative for inverted.
  * @param {string} blockText The block id or pattern to build with.
  * @param {boolean} hollow When true, only the shell is built.
  * @param {boolean} includeAir When true, air cells are filled too.
@@ -109,7 +110,8 @@ function buildPyramid(player, size, blockText, hollow, includeAir) {
     if (busy) {
         return busy;
     }
-    const s = Math.max(1, Math.floor(size));
+    const inverted = Math.floor(size) < 0;
+    const s = Math.max(1, Math.abs(Math.floor(size)));
     const checked = shapePattern(blockText, pyramidVolume(s));
     if (!checked.ok) {
         return checked;
@@ -118,8 +120,9 @@ function buildPyramid(player, size, blockText, hollow, includeAir) {
     const half = s - 1;
     const bboxMin = { x: c.x - half, y: c.y, z: c.z - half };
     const bboxMax = { x: c.x + half, y: c.y + s - 1, z: c.z + half };
-    const label = (hollow ? "Hollow Pyramid " : "Pyramid ") + "§b" + checked.pattern.label;
-    runShapeEdit(player, player.dimension, pyramidRuns(c, s, Boolean(hollow)), bboxMin, bboxMax, checked.pattern, Boolean(includeAir), label, null);
+    const kind = inverted ? "Inverted Pyramid " : "Pyramid ";
+    const label = (hollow ? "Hollow " + kind : kind) + "§b" + checked.pattern.label;
+    runShapeEdit(player, player.dimension, pyramidRuns(c, s, Boolean(hollow), inverted), bboxMin, bboxMax, checked.pattern, Boolean(includeAir), label, null);
     return { ok: true, message: "§a" + label + "§a started..." };
 }
 

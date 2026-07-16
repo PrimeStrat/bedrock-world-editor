@@ -16,17 +16,19 @@ function pyramidVolume(size) {
 }
 
 /**
- * Yields horizontal X-runs covering a square pyramid whose base is centered on
- * the given point, shrinking one block per layer up to the apex. When hollow,
+ * Yields horizontal X-runs covering a square pyramid based at the given point.
+ * Upright pyramids shrink one block per layer up to the apex; inverted ones
+ * grow one block per layer from a single-block apex at the base. When hollow,
  * each layer is only its perimeter ring.
  * @param {Vec3} center The base center of the pyramid.
  * @param {number} size The pyramid height in blocks.
  * @param {boolean} hollow When true, emit only the shell.
+ * @param {boolean} inverted When true, build apex-down (widening upward).
  * @returns {Generator<Run>} The pyramid runs.
  */
-function* pyramidRuns(center, size, hollow) {
+function* pyramidRuns(center, size, hollow, inverted) {
     for (let dy = 0; dy < size; dy++) {
-        const half = size - 1 - dy;
+        const half = inverted ? dy : size - 1 - dy;
         const y = center.y + dy;
         const width = 2 * half + 1;
         if (!hollow || half === 0) {

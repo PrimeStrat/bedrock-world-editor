@@ -13,7 +13,7 @@ function pyramidVariant(name, usePattern, hollow) {
     return {
         definition: {
             name,
-            description: "Build a " + (hollow ? "hollow " : "") + "pyramid from a block or pattern.",
+            description: "Build a " + (hollow ? "hollow " : "") + "pyramid (negative size = inverted).",
             permissionLevel: CommandPermissionLevel.Admin,
             cheatsRequired: false,
             mandatoryParameters: [

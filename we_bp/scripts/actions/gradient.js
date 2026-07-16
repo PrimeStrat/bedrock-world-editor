@@ -72,30 +72,35 @@ function scanInventory(player) {
 }
 
 /**
- * Arms gradient capture under a name: the next stop scans the inventory into
- * this gradient. Prompts the player to set up their blocks.
+ * Arms gradient capture under a name, with a projection type and interpolation:
+ * the next stop scans the inventory into this gradient. Planar runs the
+ * gradient along the pos1->pos2 axis; spherical radiates from pos1 out to the
+ * pos2 radius. Interpolation shapes where band boundaries land (nearest hard,
+ * linear even, bezier eased through the middle).
  * @param {Player} player The acting player.
  * @param {string} name The gradient name.
+ * @param {string} type One of "planar", "spherical".
+ * @param {string} interp One of "nearest", "linear", "bezier".
  * @returns {ActionResult} The result.
  */
-function startGradient(player, name) {
+function startGradient(player, name, type, interp) {
     const key = String(name ?? "").trim().toLowerCase();
     if (key === "") {
         return { ok: false, message: "§cName the gradient, e.g. /we:gradient start mymix." };
     }
-    pendingCaptures.set(player.name, key);
-    return { ok: true, message: "§aBuilding gradient §f#" + key + "§a. Add blocks to your inventory in low-to-high order (count widens a band), then /we:gradient stop." };
+    pendingCaptures.set(player.name, { key, type: type ?? "planar", interp: interp ?? "linear" });
+    return { ok: true, message: "§aBuilding gradient §f#" + key + "§a (" + (type ?? "planar") + ", " + (interp ?? "linear") + "). Add blocks to your inventory in low-to-high order (count widens a band), then /we:gradient stop." };
 }
 
 /**
- * Locks in the armed gradient by scanning the inventory into a weighted blend
- * and saving it. Requires a prior start.
+ * Locks in the armed gradient by scanning the inventory into ordered bands and
+ * saving it with its projection type and interpolation. Requires a prior start.
  * @param {Player} player The acting player.
  * @returns {ActionResult} The result.
  */
 function stopGradient(player) {
-    const key = pendingCaptures.get(player.name);
-    if (!key) {
+    const pending = pendingCaptures.get(player.name);
+    if (!pending) {
         return { ok: false, message: "§cNothing to lock in. Use /we:gradient start <name> first." };
     }
     const scan = scanInventory(player);
@@ -104,9 +109,9 @@ function stopGradient(player) {
     }
     pendingCaptures.delete(player.name);
     const map = loadGradients(player);
-    map[key] = scan.bands;
+    map[pending.key] = { bands: scan.bands, type: pending.type, interp: pending.interp };
     storeGradients(player, map);
-    return { ok: true, message: "§aGradient §f#" + key + "§a locked in: §b" + scan.label + "§a. Use it with /we:brush <name> gradient sphere #" + key + "§a." };
+    return { ok: true, message: "§aGradient §f#" + pending.key + "§a locked in: §b" + scan.label + "§a (" + pending.type + ", " + pending.interp + "). Use it with /we:brush <name> gradient sphere #" + pending.key + "§a." };
 }
 
 /**
@@ -137,8 +142,27 @@ function listGradients(player) {
     if (names.length === 0) {
         return { ok: true, message: "§7No gradients. Add blocks to your inventory then /we:gradient start <name>." };
     }
-    const lines = names.map((name) => "§f#" + name + "§7: §b" + bandsLabel(map[name]));
+    const lines = names.map((name) => {
+        const cfg = normalizeConfig(map[name]);
+        return "§f#" + name + "§7 (" + cfg.type + "/" + cfg.interp + "): §b" + bandsLabel(cfg.bands);
+    });
     return { ok: true, message: "§6Gradients:\n" + lines.join("\n") };
+}
+
+/**
+ * Normalizes a stored gradient value into a {bands, type, interp} config,
+ * accepting the legacy bare-bands array (planar/linear defaults) or null.
+ * @param {*} value The stored gradient value.
+ * @returns {{bands: {id: string, weight: number}[], type: string, interp: string}|null} The config, or null.
+ */
+function normalizeConfig(value) {
+    if (Array.isArray(value)) {
+        return { bands: value, type: "planar", interp: "linear" };
+    }
+    if (value && Array.isArray(value.bands)) {
+        return { bands: value.bands, type: value.type ?? "planar", interp: value.interp ?? "linear" };
+    }
+    return null;
 }
 
 /**
@@ -151,24 +175,30 @@ function bandsLabel(bands) {
 }
 
 /**
- * Returns a player's saved gradients as name-and-band entries, skipping any
- * stored in an old non-band format.
+ * Returns a player's saved gradients as name-and-config entries.
  * @param {Player} player The owning player.
- * @returns {{name: string, bands: {id: string, weight: number}[], label: string}[]} The gradient entries.
+ * @returns {{name: string, bands: {id: string, weight: number}[], type: string, interp: string, label: string}[]} The gradient entries.
  */
 function gradientEntries(player) {
     const map = loadGradients(player);
-    return Object.keys(map).filter((name) => Array.isArray(map[name])).map((name) => ({ name, bands: map[name], label: bandsLabel(map[name]) }));
+    const out = [];
+    for (const name of Object.keys(map)) {
+        const cfg = normalizeConfig(map[name]);
+        if (cfg) {
+            out.push({ name, bands: cfg.bands, type: cfg.type, interp: cfg.interp, label: bandsLabel(cfg.bands) });
+        }
+    }
+    return out;
 }
 
 /**
- * Returns a player's gradient bands by name, loading from persistence on a
+ * Returns a player's gradient config by name, loading from persistence on a
  * cache miss.
  * @param {string} playerName The owning player's name.
  * @param {string} name The gradient name.
- * @returns {{id: string, weight: number}[]|null} The bands, or null.
+ * @returns {{bands: {id: string, weight: number}[], type: string, interp: string}|null} The config, or null.
  */
-function gradientBands(playerName, name) {
+function gradientConfig(playerName, name) {
     let map = gradientCache.get(playerName);
     if (!map) {
         const player = world.getAllPlayers().find((p) => p.name === playerName);
@@ -177,8 +207,18 @@ function gradientBands(playerName, name) {
         }
         map = loadGradients(player);
     }
-    const value = map[String(name).trim().toLowerCase()];
-    return Array.isArray(value) ? value : null;
+    return normalizeConfig(map[String(name).trim().toLowerCase()]);
+}
+
+/**
+ * Returns a player's gradient bands by name, or null.
+ * @param {string} playerName The owning player's name.
+ * @param {string} name The gradient name.
+ * @returns {{id: string, weight: number}[]|null} The bands, or null.
+ */
+function gradientBands(playerName, name) {
+    const cfg = gradientConfig(playerName, name);
+    return cfg ? cfg.bands : null;
 }
 
 /**
@@ -198,4 +238,4 @@ function resolveGradient(playerName, name) {
 
 setGradientResolver(resolveGradient);
 
-export { startGradient, stopGradient, deleteGradient, listGradients, gradientEntries, gradientBands };
+export { startGradient, stopGradient, deleteGradient, listGradients, gradientEntries, gradientBands, gradientConfig };

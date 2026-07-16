@@ -9,6 +9,20 @@ import { fallingBlockSweeper } from "./protect.js";
  */
 
 /**
+ * Deterministic hash noise in [0, 1] for a horizontal cell, used by the
+ * roughen and distort terrain modes so a stroke is stable across ticks.
+ * @param {number} x The cell X.
+ * @param {number} z The cell Z.
+ * @returns {number} A value in [0, 1).
+ */
+function surfaceNoise(x, z) {
+    let h = (x * 374761393) ^ (z * 668265263);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h = (h ^ (h >>> 16)) >>> 0;
+    return h / 4294967296;
+}
+
+/**
  * Sets a single cell to a permutation and records the change when it differs.
  * @param {Dimension} dimension The dimension to edit.
  * @param {Vec3} loc The cell location.
@@ -102,12 +116,20 @@ function* terrainBrushJob(dimension, center, radius, strength, mode, playerName)
             const surface = heights.get(key);
             const falloff = 0.5 + 0.5 * Math.cos(Math.PI * Math.sqrt(d2) / (radius + 0.5));
             let target = surface;
-            if (mode === "raise") {
+            if (mode === "raise" || mode === "extrude") {
                 target = surface + Math.round(strength * falloff);
             } else if (mode === "lower") {
                 target = surface - Math.round(strength * falloff);
             } else if (mode === "flatten") {
                 target = Math.round(surface + (average - surface) * falloff);
+            } else if (mode === "roughen") {
+                const jitter = (surfaceNoise(x, z) * 2 - 1) * strength;
+                target = surface + Math.round(jitter * falloff);
+            } else if (mode === "distort") {
+                const sx = x + Math.round((surfaceNoise(x + 13, z) * 2 - 1) * strength * falloff);
+                const sz = z + Math.round((surfaceNoise(x, z + 47) * 2 - 1) * strength * falloff);
+                const displaced = heights.get(sx + "," + sz);
+                target = displaced !== undefined ? displaced : surface;
             } else {
                 let sum = 0;
                 let count = 0;

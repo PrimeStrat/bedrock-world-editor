@@ -114,6 +114,7 @@ function* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, n
             const areaMax = { x: Math.min(ax + span - 1, bboxMax.x), y: bboxMax.y, z: Math.min(az + span - 1, bboxMax.z) };
             const ok = yield* tickAreaFor(dimension, areaMin, areaMax, playerName);
             if (!ok) {
+                yield;
                 continue;
             }
             let sinceYield = 0;

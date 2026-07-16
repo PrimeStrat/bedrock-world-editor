@@ -43,7 +43,6 @@ import { descendCommand } from "./descend.js";
 import { ceilCommand } from "./ceil.js";
 import { thruCommand } from "./thru.js";
 import { jumpToCommand } from "./jumpto.js";
-import { menuCommand } from "./menu.js";
 import { debugCommand } from "./debug.js";
 import { brushCommand } from "./brush.js";
 import { generateCommand } from "./generate.js";
@@ -57,6 +56,8 @@ import { drawCommand } from "./draw.js";
 import { smoothCommand } from "./smooth.js";
 import { setBrushCommand } from "./setbrush.js";
 import { clearBrushCommand } from "./clearbrush.js";
+import { floodFillCommand } from "./floodfill.js";
+import { bookCommand } from "./book.js";
 import { posCommand } from "./pos.js";
 
 const COMMANDS = [
@@ -119,7 +120,6 @@ const COMMANDS = [
     ceilCommand,
     thruCommand,
     jumpToCommand,
-    menuCommand,
     debugCommand,
     brushCommand,
     generateCommand,
@@ -134,6 +134,8 @@ const COMMANDS = [
     smoothCommand,
     setBrushCommand,
     clearBrushCommand,
+    floodFillCommand,
+    bookCommand,
     posCommand
 ];
 
@@ -146,11 +148,13 @@ function registerCommands(registry) {
     registry.registerEnum("we:direction", Object.keys(DIRECTIONS));
     registry.registerEnum("we:axis", ["x", "z"]);
     registry.registerEnum("we:brushshape", ["sphere", "cylinder", "hsphere", "hcylinder", "none"]);
-    registry.registerEnum("we:brushtype", ["sculpt", "paint", "erase", "gradient"]);
+    registry.registerEnum("we:brushtype", ["sculpt", "paint", "erase", "gradient", "noise"]);
     registry.registerEnum("we:symmetryaction", ["set", "flip", "rotate", "radial", "status", "clear"]);
     registry.registerEnum("we:flipaxis", ["x", "y", "z"]);
     registry.registerEnum("we:gradientaction", ["start", "stop", "delete", "list"]);
-    registry.registerEnum("we:terrainop", ["raise", "lower", "flatten", "smooth"]);
+    registry.registerEnum("we:gradienttype", ["planar", "spherical"]);
+    registry.registerEnum("we:gradientinterp", ["nearest", "linear", "bezier"]);
+    registry.registerEnum("we:terrainop", ["raise", "lower", "flatten", "smooth", "extrude", "roughen", "distort"]);
     registry.registerEnum("we:smoothmode", ["stable", "melt", "grow"]);
     registry.registerEnum("we:pathcurve", ["line", "arch", "catenary", "bezier"]);
     registry.registerEnum("we:pathshape", ["deck", "tube"]);

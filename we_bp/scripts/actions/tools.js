@@ -5,7 +5,10 @@ import { sphereRuns } from "../shapes/sphere.js";
 import { cylinderRuns } from "../shapes/cylinder.js";
 import { runBrushFill } from "../operations/brushfill.js";
 import { runTerrainBrush } from "../operations/terrain.js";
-import { gradientBands } from "./gradient.js";
+import { gradientConfig } from "./gradient.js";
+import { blockForFraction, gradientFraction } from "./gradmap.js";
+import { noisePermutation } from "./noise.js";
+import { getSelection } from "../session.js";
 import { loadPlayerData, savePlayerData } from "../persist.js";
 
 const BRUSH_ITEM = "we:brush";
@@ -117,7 +120,7 @@ function saveBrushPreset(player, name, brushType, shape, blockText, radius, heig
         text = "air";
     } else if (brushType === "gradient") {
         gradient = String(blockText ?? "").replace(/^#/, "").trim().toLowerCase();
-        if (!gradientBands(player.name, gradient)) {
+        if (!gradientConfig(player.name, gradient)) {
             return { ok: false, message: "§cNo gradient named §f#" + gradient + "§c. Make one with /we:gradient." };
         }
         text = "";
@@ -137,7 +140,8 @@ function saveBrushPreset(player, name, brushType, shape, blockText, radius, heig
         hollow: Boolean(hollow),
         includeAir: brushType === "erase",
         surfaceOnly,
-        gradient
+        gradient,
+        seed: brushType === "noise" ? Math.floor(Math.random() * 1000000) : 0
     };
     const map = loadPresets(player);
     map[key] = preset;
@@ -340,6 +344,10 @@ function applyBrush(player, preset, target, view) {
         player.onScreenDisplay.setActionBar("§cBrush block is invalid.");
         return;
     }
+    if (preset.brushType === "noise") {
+        applyNoiseBrush(player, preset, target, pattern);
+        return;
+    }
     const label = presetLabel(preset.brushType) + " §b" + pattern.label;
     const runs = preset.surfaceOnly
         ? facingSurfaceRuns(player.dimension, target, preset.radius, view)
@@ -348,31 +356,44 @@ function applyBrush(player, preset, target, view) {
 }
 
 /**
- * Returns the band block id for a spatial fraction (0 to 1) through gradient
- * bands, each band's share proportional to its weight.
- * @param {{id: string, weight: number}[]} bands The gradient bands.
- * @param {number} t The spatial fraction from 0 to 1.
- * @returns {string} The chosen block id.
+ * Applies a noise brush: fills the brush sphere, choosing each cell's block by
+ * a smooth value-noise field so the pattern's blocks cluster into organic
+ * patches rather than random speckle. Cells are grouped by block so the stroke
+ * is one fill per distinct block.
+ * @param {Player} player The acting player.
+ * @param {BrushPreset} preset The noise brush preset.
+ * @param {{x: number, y: number, z: number}} target The target cell.
+ * @param {import("./common.js").FillPattern} pattern The parsed block pattern.
+ * @returns {void}
  */
-function bandAt(bands, t) {
-    let total = 0;
-    for (const band of bands) {
-        total += band.weight;
-    }
-    let cut = Math.max(0, Math.min(1, t)) * total;
-    for (const band of bands) {
-        cut -= band.weight;
-        if (cut < 0) {
-            return band.id;
+function applyNoiseBrush(player, preset, target, pattern) {
+    const cells = Array.from(sphereRuns(target, preset.radius, false));
+    const byBlock = new Map();
+    for (const run of cells) {
+        for (let x = run.x; x < run.x + run.length; x++) {
+            const perm = noisePermutation(pattern.entries, pattern.total, x, run.y, run.z, preset.seed, 0.15);
+            const id = perm.type.id;
+            let group = byBlock.get(id);
+            if (!group) {
+                group = [];
+                byBlock.set(id, group);
+            }
+            group.push({ x, y: run.y, z: run.z, length: 1 });
         }
     }
-    return bands[bands.length - 1].id;
+    for (const [id, runs] of byBlock.entries()) {
+        runBrushFill(player, player.dimension, runs, parsePattern(id), true, "Noise §b" + pattern.label);
+    }
 }
 
 /**
- * Applies a gradient brush: each cell's block comes from its height within the
- * brush mapped through the gradient bands, an ordered vertical transition.
- * Paint mode recolors only the exposed surface; sculpt fills the sphere.
+ * Applies a gradient brush: the gradient runs from pos1 to pos2. When the
+ * player has a selection, that is the axis (planar) or center+radius
+ * (spherical); otherwise it defaults to the bottom-to-top of the brush sphere.
+ * Each cell's block is its projected fraction along the gradient mapped through
+ * the ordered bands with the gradient's interpolation. Paint mode recolors only
+ * the exposed surface; sculpt fills the sphere. Cells are grouped by block so
+ * the stroke is one fill per distinct block.
  * @param {Player} player The acting player.
  * @param {BrushPreset} preset The gradient brush preset.
  * @param {{x: number, y: number, z: number}} target The target cell.
@@ -380,29 +401,52 @@ function bandAt(bands, t) {
  * @returns {void}
  */
 function applyGradientBrush(player, preset, target, view) {
-    const bands = gradientBands(player.name, preset.gradient);
-    if (!bands) {
+    const cfg = gradientConfig(player.name, preset.gradient);
+    if (!cfg) {
         player.onScreenDisplay.setActionBar("§cGradient #" + preset.gradient + " is gone.");
         return;
     }
     const cells = preset.surfaceOnly
         ? facingSurfaceRuns(player.dimension, target, preset.radius, view)
-        : sphereRuns(target, preset.radius, false);
-    const span = preset.radius * 2;
+        : Array.from(sphereRuns(target, preset.radius, false));
+    const axis = gradientAxis(player, preset, target, cfg.type);
     const byBlock = new Map();
     for (const run of cells) {
-        const t = span > 0 ? (run.y - (target.y - preset.radius)) / span : 0;
-        const id = bandAt(bands, t);
-        let group = byBlock.get(id);
-        if (!group) {
-            group = [];
-            byBlock.set(id, group);
+        for (let x = run.x; x < run.x + run.length; x++) {
+            const t = gradientFraction({ x, y: run.y, z: run.z }, axis.from, axis.to, cfg.type);
+            const id = blockForFraction(cfg.bands, t, cfg.interp);
+            let group = byBlock.get(id);
+            if (!group) {
+                group = [];
+                byBlock.set(id, group);
+            }
+            group.push({ x, y: run.y, z: run.z, length: 1 });
         }
-        group.push({ x: run.x, y: run.y, z: run.z, length: run.length });
     }
     for (const [id, runs] of byBlock.entries()) {
         runBrushFill(player, player.dimension, runs, parsePattern(id), true, "Gradient §b#" + preset.gradient);
     }
+}
+
+/**
+ * Returns the gradient's from/to endpoints: the player's selection when set,
+ * else a vertical span across the brush sphere so a lone brush still gradients
+ * bottom to top.
+ * @param {Player} player The acting player.
+ * @param {BrushPreset} preset The gradient brush preset.
+ * @param {{x: number, y: number, z: number}} target The brush center.
+ * @param {string} type The gradient type ("planar" or "spherical").
+ * @returns {{from: {x: number, y: number, z: number}, to: {x: number, y: number, z: number}}} The endpoints.
+ */
+function gradientAxis(player, preset, target, type) {
+    const sel = getSelection(player.name);
+    if (sel.pos1 && sel.pos2) {
+        return { from: sel.pos1, to: sel.pos2 };
+    }
+    if (type === "spherical") {
+        return { from: target, to: { x: target.x + preset.radius, y: target.y, z: target.z } };
+    }
+    return { from: { x: target.x, y: target.y - preset.radius, z: target.z }, to: { x: target.x, y: target.y + preset.radius, z: target.z } };
 }
 
 /**

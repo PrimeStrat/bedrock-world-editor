@@ -14,6 +14,18 @@ const MAX_HEIGHT = 384;
 const clipboards = new Map();
 
 /**
+ * Returns the block a player is standing in: their feet position floored on
+ * every axis. Copy and paste share this so a paste lands at exactly the offset
+ * the selection had from the player when it was copied.
+ * @param {Player} player The player.
+ * @returns {Vec3} The anchor block location.
+ */
+function playerBlock(player) {
+    const loc = player.location;
+    return { x: Math.floor(loc.x), y: Math.floor(loc.y), z: Math.floor(loc.z) };
+}
+
+/**
  * Maps a quarter-turn count to a StructureRotation value.
  * @param {number} quarters The number of 90-degree clockwise turns (0-3).
  * @returns {string} The matching StructureRotation.
@@ -99,7 +111,7 @@ function copySelection(player, pos1, pos2) {
         }
     }
 
-    const base = { x: Math.floor(player.location.x), y: Math.floor(player.location.y), z: Math.floor(player.location.z) };
+    const base = playerBlock(player);
     clipboards.set(player.name, {
         tiles,
         size: { x: maxX - minX + 1, y: sizeY, z: maxZ - minZ + 1 },
@@ -108,7 +120,7 @@ function copySelection(player, pos1, pos2) {
         flipX: false,
         flipZ: false
     });
-    return { ok: true, message: "Copied " + tiles.length + " tile(s)." };
+    return { ok: true, message: "Copied " + tiles.length + " tile(s). Paste keeps this offset from where you stand." };
 }
 
 /**
@@ -232,7 +244,7 @@ function pasteClipboard(player, skipAir) {
     }
     const quarters = quartersFor(clip.rotation);
     const rotSize = rotatedSize(clip.size, quarters);
-    const base = { x: Math.floor(player.location.x), y: Math.floor(player.location.y), z: Math.floor(player.location.z) };
+    const base = playerBlock(player);
     const rotMin = transformedMinFromPivot(clip.offset, clip.size, quarters, clip.flipX, clip.flipZ);
     const targetMin = { x: base.x + rotMin.x, y: base.y + rotMin.y, z: base.z + rotMin.z };
     const targetMax = { x: targetMin.x + rotSize.x - 1, y: targetMin.y + rotSize.y - 1, z: targetMin.z + rotSize.z - 1 };

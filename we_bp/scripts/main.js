@@ -7,6 +7,10 @@ import { beginStroke, endStroke } from "./actions/tools.js";
 import { mirrorPlacement, mirrorBreak } from "./actions/symmetry.js";
 import { isDrawMode, toggleTrace } from "./actions/draw.js";
 import { selectionSizeSuffix } from "./actions/selection.js";
+import { renderSelection } from "./actions/selectionRender.js";
+import { openGuide } from "./menu/guide.js";
+
+const GUIDE_ITEM = "we:guide";
 
 const POS1_COOLDOWN_TICKS = 5;
 const lastPos1Ticks = new Map();
@@ -54,6 +58,10 @@ world.beforeEvents.playerBreakBlock.subscribe(ev => {
 
 world.afterEvents.itemUse.subscribe(ev => {
     const player = ev.source;
+    if (ev.itemStack && ev.itemStack.typeId === GUIDE_ITEM) {
+        system.run(() => openGuide(player));
+        return;
+    }
     if (player.getGameMode() !== GameMode.Creative) return;
     if (isWandUse(player, ev.itemStack) && isDrawMode(player.name)) {
         toggleTrace(player);

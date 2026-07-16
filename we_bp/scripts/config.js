@@ -10,6 +10,7 @@ const WE_CONFIG = {
     capacityWaitTicks: 200,
     brushRange: 128,
     brushMaxRadius: 5,
+    nearMaxRadius: 64,
     maxPatternBlocks: 1000000
 };
 
