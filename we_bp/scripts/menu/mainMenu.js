@@ -32,7 +32,7 @@ async function openBrushMenu(player) {
             slot: 10, icon: "textures/items/we_brush", hover: "§e§lNew Brush...§r\n§7Save+equip a World Brush preset", run: async (p) => {
                 const input = await promptNewBrush(p);
                 if (input) {
-                    report(p, saveBrushPreset(p, input.name, input.brushType, input.shape, input.blockText, input.radius, input.height, input.hollow));
+                    report(p, saveBrushPreset(p, input.name, input.brushType, input.shape, input.blockText, input.radius, input.height, input.hollow, true));
                 }
             }
         },
@@ -59,7 +59,7 @@ async function openBrushMenu(player) {
 async function promptNewBrush(player) {
     const form = new ModalFormData().title("New Brush")
         .textField("Name", "hills")
-        .dropdown("Type", ["Sculpt (fill shape)", "Paint (surface)", "Erase", "Gradient (surface)", "Noise (organic mix)"], { defaultValueIndex: 0 })
+        .dropdown("Type", ["Sculpt - fill the shape (add mass)", "Paint - reskin the surface facing you", "Erase - carve a hole", "Gradient - surface, steps a #gradient", "Noise - fill, blocks in organic patches"], { defaultValueIndex: 0 })
         .dropdown("Shape", ["Sphere", "Cylinder", "Hollow sphere", "Hollow cylinder"], { defaultValueIndex: 0 })
         .textField("Block/pattern (or #gradient for gradient type)", "stone")
         .slider("Radius", 1, 5, { valueStep: 1, defaultValue: 3 })

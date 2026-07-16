@@ -58,21 +58,46 @@ const SECTIONS = [
     },
     {
         title: "World Brush",
-        intro: "The World Brush item paints while you hold right-click. Save a preset with /we:brush, then equip it. Types: sculpt (fill), paint (surface), erase, gradient, noise.",
+        intro: "The World Brush item paints while you hold right-click. Save a preset with /we:brush (single block) or /we:ebrush (pattern or #gradient), then equip it.",
         entries: [
-            { cmd: "/we:brush <name> <type> [shape] [block] [radius] [height]", desc: "Save and equip a brush preset." },
+            { cmd: "/we:brush <name> <type> [shape] [block] [radius] [height]", desc: "Save and equip a brush with a single block." },
+            { cmd: "/we:ebrush <name> <type> [shape] [pattern] ...", desc: "Same, but the block is a pattern like stone,andesite or a #gradient." },
+            { cmd: "/we:brushes", desc: "Open the brush menu." },
             { cmd: "/we:setbrush", desc: "Menu to equip a saved brush preset." },
             { cmd: "/we:clearbrush", desc: "Unequip the World Brush." },
             { cmd: "/we:gradient start|stop|delete|list", desc: "Build an ordered gradient from your inventory blocks." }
         ]
     },
     {
+        title: "Brush Types",
+        intro: "The <type> you pick when saving a brush. paint and gradient only touch the surface facing you; sculpt, erase and noise fill the whole shape.",
+        entries: [
+            { cmd: "sculpt", desc: "Fills the whole brush shape with your block - adds solid mass wherever you look." },
+            { cmd: "paint", desc: "Recolors only the exposed surface facing you. Reskins a wall or the ground top without changing its form." },
+            { cmd: "erase", desc: "Fills the shape with air - carves a hole." },
+            { cmd: "gradient", desc: "Surface recolor whose block steps through a saved #gradient along your pos1->pos2 (or bottom->top of the brush)." },
+            { cmd: "noise", desc: "Fills the shape, but picks each cell's block from your pattern by smooth noise, so blocks form organic patches instead of random speckle. Only differs from sculpt with a multi-block pattern." }
+        ]
+    },
+    {
         title: "Terrain Builder",
         intro: "The Terrain Builder item sculpts terrain while you hold right-click. Set its mode with /we:terrain. Repeated clicks stack seamlessly.",
         entries: [
-            { cmd: "/we:terrain <mode> [radius] [strength]", desc: "raise, lower, flatten, smooth, extrude, roughen, distort." },
+            { cmd: "/we:terrain <mode> [radius] [strength]", desc: "Set the mode (see Terrain Modes below)." },
             { cmd: "/we:floodfill <block> [limit] [up] [down] [corners]", desc: "Flood a connected area from your crosshair." },
             { cmd: "/we:smooth", desc: "Smooth the selection, preserving mass." }
+        ]
+    },
+    {
+        title: "Terrain Modes",
+        intro: "The <mode> for the Terrain Builder. It reads the surface each click, so repeated clicks on a spot stack seamlessly with a soft falloff.",
+        entries: [
+            { cmd: "raise / lower", desc: "Pull the surface up or push it down." },
+            { cmd: "flatten", desc: "Level the area toward its average height." },
+            { cmd: "smooth", desc: "Blend heights with neighbors to soften bumps." },
+            { cmd: "extrude", desc: "Push the surface outward (like raise, following the surface block)." },
+            { cmd: "roughen", desc: "Add random jitter to heights for a rocky, uneven look." },
+            { cmd: "distort", desc: "Warp the surface sideways with noise for a wavy, broken edge." }
         ]
     },
     {

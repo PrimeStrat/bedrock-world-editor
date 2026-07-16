@@ -98,7 +98,8 @@ function clampRadius(radius) {
 /**
  * Defines and saves a named brush preset, then gives the player the brush item.
  * Paint and gradient types only recolor the exposed surface; sculpt and noise
- * fill the whole shape.
+ * fill the whole shape. The gradient and noise types need a pattern or gradient
+ * name, so they are only allowed when allowPattern is set (the /we:ebrush path).
  * @param {Player} player The acting player.
  * @param {string} name The preset name.
  * @param {string} brushType One of "sculpt", "paint", "erase", "gradient", "noise".
@@ -107,12 +108,16 @@ function clampRadius(radius) {
  * @param {number} radius The brush radius.
  * @param {number} height The cylinder height (ignored for spheres).
  * @param {boolean} hollow When true, only the shell is built.
+ * @param {boolean} allowPattern When true, pattern-based types (gradient, noise) are allowed.
  * @returns {ActionResult} The result.
  */
-function saveBrushPreset(player, name, brushType, shape, blockText, radius, height, hollow) {
+function saveBrushPreset(player, name, brushType, shape, blockText, radius, height, hollow, allowPattern) {
     const key = String(name ?? "").trim().toLowerCase();
     if (key === "") {
         return { ok: false, message: "§cName the brush, e.g. /we:brush hills sculpt sphere stone 4." };
+    }
+    if (!allowPattern && (brushType === "gradient" || brushType === "noise")) {
+        return { ok: false, message: "§c" + brushType + " brushes need a pattern - use §f/we:ebrush§c instead." };
     }
     let text = blockText;
     let gradient = null;

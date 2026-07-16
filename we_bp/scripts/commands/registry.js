@@ -44,7 +44,7 @@ import { ceilCommand } from "./ceil.js";
 import { thruCommand } from "./thru.js";
 import { jumpToCommand } from "./jumpto.js";
 import { debugCommand } from "./debug.js";
-import { brushCommand } from "./brush.js";
+import { brushCommand, ebrushCommand } from "./brush.js";
 import { generateCommand } from "./generate.js";
 import { cancelCommand } from "./cancel.js";
 import { centerCommand } from "./center.js";
@@ -123,6 +123,7 @@ const COMMANDS = [
     jumpToCommand,
     debugCommand,
     brushCommand,
+    ebrushCommand,
     generateCommand,
     cancelCommand,
     centerCommand,
