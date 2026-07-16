@@ -2,9 +2,11 @@ import { world, system } from "@minecraft/server";
 
 const MAX_EVENTS = 8;
 const STATUS_INTERVAL_TICKS = 10;
+const PROCESSING_INTERVAL_TICKS = 30;
 const progress = new Map();
 const events = new Map();
 const lastStatusTick = new Map();
+const lastProcessingTick = new Map();
 
 /**
  * @typedef {{label: string, blocks: number, batchesOk: number, batchesSkipped: number, startTick: number, endTick: number|null}} EditProgress
@@ -56,16 +58,22 @@ function debugProgress(playerName, blocks) {
 }
 
 /**
- * Shows a throttled "Processing..." action bar for a player's tracked edit,
- * used while a batch is loading chunks and no blocks are changing yet so the
- * edit does not look frozen.
+ * Shows a "Processing..." action bar for a player's tracked edit, re-sent on
+ * its own 30-tick cadence while a batch is loading chunks and no blocks are
+ * changing yet, so the edit does not look frozen.
  * @param {string} playerName The acting player's name.
  * @returns {void}
  */
 function debugProcessing(playerName) {
+    const now = system.currentTick;
+    const last = lastProcessingTick.get(playerName) ?? -PROCESSING_INTERVAL_TICKS;
+    if (now - last < PROCESSING_INTERVAL_TICKS) {
+        return;
+    }
+    lastProcessingTick.set(playerName, now);
     const entry = progress.get(playerName);
     const label = entry ? entry.label : "World edit";
-    debugStatus(playerName, "§7" + label + ": §fProcessing§7...");
+    debugStatus(playerName, "§7" + label + ": §fProcessing§7...", true);
 }
 
 /**
