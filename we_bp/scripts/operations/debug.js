@@ -27,10 +27,10 @@ function debugStart(playerName, label) {
  * @param {string} text The status text.
  * @returns {void}
  */
-function debugStatus(playerName, text) {
+function debugStatus(playerName, text, force) {
     const now = system.currentTick;
     const last = lastStatusTick.get(playerName) ?? -STATUS_INTERVAL_TICKS;
-    if (now - last < STATUS_INTERVAL_TICKS) {
+    if (!force && now - last < STATUS_INTERVAL_TICKS) {
         return;
     }
     lastStatusTick.set(playerName, now);
@@ -53,6 +53,19 @@ function debugProgress(playerName, blocks) {
         entry.blocks = blocks;
         debugStatus(playerName, "§7" + entry.label + ": §f" + blocks + "§7 block(s)...");
     }
+}
+
+/**
+ * Shows a throttled "Processing..." action bar for a player's tracked edit,
+ * used while a batch is loading chunks and no blocks are changing yet so the
+ * edit does not look frozen.
+ * @param {string} playerName The acting player's name.
+ * @returns {void}
+ */
+function debugProcessing(playerName) {
+    const entry = progress.get(playerName);
+    const label = entry ? entry.label : "World edit";
+    debugStatus(playerName, "§7" + label + ": §fProcessing§7...");
 }
 
 /**
@@ -117,4 +130,4 @@ function debugSkipped(playerName) {
     return entry ? entry.batchesSkipped : 0;
 }
 
-export { debugStart, debugProgress, debugEnd, debugTickArea, debugSnapshot, debugStatus, debugSkipped };
+export { debugStart, debugProgress, debugProcessing, debugEnd, debugTickArea, debugSnapshot, debugStatus, debugSkipped };

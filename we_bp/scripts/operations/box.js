@@ -81,6 +81,7 @@ function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, mask
             const areaMax = { x: Math.min(ax + span - 1, max.x), y: max.y, z: Math.min(az + span - 1, max.z) };
             const ok = yield* tickAreaFor(dimension, areaMin, areaMax, playerName);
             if (!ok) {
+                yield;
                 continue;
             }
             if (single) {

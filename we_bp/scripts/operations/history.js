@@ -5,7 +5,7 @@ import { tickAreaFor, releaseTickArea, pickAreaSpan } from "./ticking.js";
 import { refillBoxJob } from "./box.js";
 import { refillShapeJob } from "./shape.js";
 import { runTrackedJob } from "./jobs.js";
-import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
+import { debugStart, debugProgress, debugStatus, debugEnd, debugSkipped } from "./debug.js";
 
 /**
  * @typedef {{x: number, y: number, z: number}} Vec3
@@ -57,17 +57,19 @@ function applyHistoryBatch(player, records, direction, label) {
  */
 function* historyJob(records, direction, playerName, label) {
     debugStart(playerName, label);
+    const progress = { done: 0, total: leafCount(records), label };
     let blocks = 0;
     for (const record of records) {
         if (direction === "undo") {
-            yield* undoRecordJob(record, playerName);
+            yield* undoRecordJob(record, playerName, progress);
         } else {
-            yield* redoRecordJob(record, playerName);
+            yield* redoRecordJob(record, playerName, progress);
         }
         blocks += record.blocks;
     }
     releaseTickArea(playerName);
     debugEnd(playerName);
+    debugStatus(playerName, "§7" + label + ": §f" + progress.total + "/" + progress.total + "§7 edit(s) done.", true);
     const player = world.getAllPlayers().find((p) => p.name === playerName);
     if (player) {
         let message = "§a" + label + ": §f" + blocks + "§a block(s) " + (direction === "undo" ? "undone." : "redone.");
@@ -81,6 +83,32 @@ function* historyJob(records, direction, playerName, label) {
 }
 
 /**
+ * Returns the number of leaf (non-group) records a set of records expands to,
+ * used as the total for the undo/redo progress "x/x" display.
+ * @param {object[]} records The records to count.
+ * @returns {number} The leaf record count.
+ */
+function leafCount(records) {
+    let total = 0;
+    for (const record of records) {
+        total += record.kind === "group" ? leafCount(record.records) : 1;
+    }
+    return total;
+}
+
+/**
+ * Advances the shared undo/redo progress after a leaf record is applied and
+ * shows the running "x/x" on the action bar.
+ * @param {{done: number, total: number, label: string}} progress The shared progress.
+ * @param {string} playerName The acting player's name.
+ * @returns {void}
+ */
+function stepProgress(progress, playerName) {
+    progress.done += 1;
+    debugStatus(playerName, "§7" + progress.label + ": §f" + progress.done + "/" + progress.total + "§7 edit(s)...");
+}
+
+/**
  * Generator that reverses one record: groups recurse newest member first,
  * box and shape edits restore their snapshot tiles, and per-block edits
  * restore their before permutations.
@@ -88,19 +116,20 @@ function* historyJob(records, direction, playerName, label) {
  * @param {string} playerName The acting player's name.
  * @returns {Generator} The undo generator.
  */
-function* undoRecordJob(record, playerName) {
+function* undoRecordJob(record, playerName, progress) {
     if (record.kind === "group") {
         for (let i = record.records.length - 1; i >= 0; i--) {
-            yield* undoRecordJob(record.records[i], playerName);
+            yield* undoRecordJob(record.records[i], playerName, progress);
         }
         return;
     }
     const dimension = world.getDimension(record.dimensionId);
     if (record.kind === "box" || record.kind === "shape") {
         yield* placeTilesCore(dimension, record.tiles, playerName);
-        return;
+    } else {
+        yield* restoreCore(dimension, record.changes, "before", playerName);
     }
-    yield* restoreCore(dimension, record.changes, "before", playerName);
+    stepProgress(progress, playerName);
 }
 
 /**
@@ -111,23 +140,22 @@ function* undoRecordJob(record, playerName) {
  * @param {string} playerName The acting player's name.
  * @returns {Generator} The redo generator.
  */
-function* redoRecordJob(record, playerName) {
+function* redoRecordJob(record, playerName, progress) {
     if (record.kind === "group") {
         for (const member of record.records) {
-            yield* redoRecordJob(member, playerName);
+            yield* redoRecordJob(member, playerName, progress);
         }
         return;
     }
     const dimension = world.getDimension(record.dimensionId);
     if (record.kind === "box") {
         yield* refillBoxJob(dimension, record, playerName);
-        return;
-    }
-    if (record.kind === "shape") {
+    } else if (record.kind === "shape") {
         yield* refillShapeJob(dimension, record, playerName);
-        return;
+    } else {
+        yield* restoreCore(dimension, record.changes, "after", playerName);
     }
-    yield* restoreCore(dimension, record.changes, "after", playerName);
+    stepProgress(progress, playerName);
 }
 
 /**

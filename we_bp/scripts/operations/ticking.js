@@ -1,7 +1,7 @@
 import { world, system, Dimension } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { CHUNK, chunkFloor } from "./util.js";
-import { debugTickArea } from "./debug.js";
+import { debugTickArea, debugProcessing } from "./debug.js";
 
 const MAX_AREA_CHUNK_SIDE = 255;
 
@@ -64,6 +64,27 @@ function areaFullyLoaded(dimension, min, max) {
 }
 
 /**
+ * Forces the server to load every chunk covering a box by running a
+ * testforblock at each chunk's cell. testforblock touches the target block,
+ * which pulls its chunk into memory even when no player or ticking area has
+ * reached it yet, so a large edit's far chunks load instead of staying stale.
+ * @param {Dimension} dimension The dimension to load into.
+ * @param {Vec3} min The inclusive box min corner.
+ * @param {Vec3} max The inclusive box max corner.
+ * @returns {void}
+ */
+function forceLoadArea(dimension, min, max) {
+    const y = Math.max(dimension.heightRange.min, Math.min(min.y, dimension.heightRange.max - 1));
+    for (let x = chunkFloor(min.x); x <= max.x; x += CHUNK) {
+        for (let z = chunkFloor(min.z); z <= max.z; z += CHUNK) {
+            if (!dimension.isChunkLoaded({ x, y, z })) {
+                dimension.runCommand("testforblock " + x + " " + y + " " + z + " air");
+            }
+        }
+    }
+}
+
+/**
  * Generator that points the player's ticking area at a box, waiting for chunk
  * budget to free up when the manager is at capacity, then waits until the
  * area's create promise resolves (all chunks loaded and ticking). Skips area
@@ -97,6 +118,7 @@ function* tickAreaFor(dimension, min, max, playerName) {
             debugTickArea(playerName, false, "capacity wait timed out (" + manager.chunkCount + "/" + manager.maxChunkCount + " chunks used)");
             return false;
         }
+        debugProcessing(playerName);
         yield;
     }
     let loadState = 0;
@@ -107,18 +129,29 @@ function* tickAreaFor(dimension, min, max, playerName) {
     });
     const startTick = system.currentTick;
     const loadDeadline = startTick + WE_CONFIG.chunkLoadTicks;
-    while (loadState === 0 && system.currentTick < loadDeadline) {
+    // Wait for the ticking area to come up, then force-load and confirm every
+    // chunk in the box is actually loaded. The create promise resolving does not
+    // guarantee the whole span is in memory, so testforblock pulls in any that
+    // are still missing and we poll until the box is fully loaded.
+    while (system.currentTick < loadDeadline) {
+        if (loadState !== 0) {
+            forceLoadArea(dimension, min, max);
+            if (areaFullyLoaded(dimension, min, max)) {
+                break;
+            }
+        }
+        debugProcessing(playerName);
         yield;
     }
     const waitedTicks = system.currentTick - startTick;
-    if (loadState === 1) {
+    const loaded = areaFullyLoaded(dimension, min, max);
+    if (loaded) {
         debugTickArea(playerName, true, spans.x + "x" + spans.z + " chunks loaded in " + waitedTicks + " tick(s)");
         return true;
     }
-    const loaded = dimension.isChunkLoaded(min) && dimension.isChunkLoaded(max);
     const reason = loadState === -1 ? "create rejected" : "load wait timed out";
-    debugTickArea(playerName, loaded, reason + " after " + waitedTicks + " tick(s), corners " + (loaded ? "loaded" : "unloaded"));
-    return loaded;
+    debugTickArea(playerName, false, reason + " after " + waitedTicks + " tick(s), area not fully loaded");
+    return false;
 }
 
 /**
