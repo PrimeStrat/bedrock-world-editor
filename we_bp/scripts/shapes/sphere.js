@@ -28,8 +28,9 @@ function sphereVolume(radius) {
 function* sphereRuns(center, radius, hollow) {
     const outer = radiusThreshold(radius);
     const inner = radius >= 1 ? radiusThreshold(radius - 1) : -1;
-    for (let dy = -radius; dy <= radius; dy++) {
-        for (let dz = -radius; dz <= radius; dz++) {
+    const reach = Math.ceil(radius);
+    for (let dy = -reach; dy <= reach; dy++) {
+        for (let dz = -reach; dz <= reach; dz++) {
             const ho = halfWidth(outer, dy, dz);
             if (ho < 0) {
                 continue;

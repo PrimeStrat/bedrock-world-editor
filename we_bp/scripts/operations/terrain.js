@@ -71,13 +71,15 @@ function runTerrainBrush(player, dimension, center, radius, strength, mode) {
  */
 function* terrainBrushJob(dimension, center, radius, strength, mode, playerName) {
     const air = BlockPermutation.resolve(AIR_ID);
-    const sweep = fallingBlockSweeper(dimension, { x: center.x - radius, y: center.y - radius - strength, z: center.z - radius }, { x: center.x + radius, y: center.y + radius + strength, z: center.z + radius });
+    const reach = Math.ceil(radius);
+    const lift = Math.ceil(strength);
+    const sweep = fallingBlockSweeper(dimension, { x: center.x - reach, y: center.y - reach - lift, z: center.z - reach }, { x: center.x + reach, y: center.y + reach + lift, z: center.z + reach });
     const range = dimension.heightRange;
     const heights = new Map();
-    const scanTop = center.y + radius + strength + 1;
-    const scanBottom = center.y - radius - strength - 1;
-    for (let dx = -radius; dx <= radius; dx++) {
-        for (let dz = -radius; dz <= radius; dz++) {
+    const scanTop = center.y + reach + lift + 1;
+    const scanBottom = center.y - reach - lift - 1;
+    for (let dx = -reach; dx <= reach; dx++) {
+        for (let dz = -reach; dz <= reach; dz++) {
             const x = center.x + dx;
             const z = center.z + dz;
             let surface = range.min - 1;
@@ -104,8 +106,8 @@ function* terrainBrushJob(dimension, center, radius, strength, mode, playerName)
     pushUndo(playerName, record);
     const r2 = (radius + 0.5) * (radius + 0.5);
     let processed = 0;
-    for (let dx = -radius; dx <= radius; dx++) {
-        for (let dz = -radius; dz <= radius; dz++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+        for (let dz = -reach; dz <= reach; dz++) {
             const d2 = dx * dx + dz * dz;
             if (d2 > r2) {
                 continue;

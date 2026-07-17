@@ -1,15 +1,22 @@
-import { CommandPermissionLevel } from "@minecraft/server";
+import { CommandPermissionLevel, CustomCommandParamType } from "@minecraft/server";
 import { getPlayer, toCommandResult, notPlayer } from "./common.js";
-import { undoEdit } from "../actions/history.js";
+import { undoEdit, massUndo } from "../actions/history.js";
 
 const undoCommand = {
-    definition: { name: "we:undo", description: "Undo your last edit.", permissionLevel: CommandPermissionLevel.Admin, cheatsRequired: false },
-    handler(origin) {
+    definition: {
+        name: "we:undo",
+        description: "Undo your last edit, or the last <count> edits.",
+        permissionLevel: CommandPermissionLevel.Admin,
+        cheatsRequired: false,
+        optionalParameters: [{ type: CustomCommandParamType.Integer, name: "count" }]
+    },
+    handler(origin, count) {
         const player = getPlayer(origin);
         if (!player) {
             return notPlayer();
         }
-        return toCommandResult(undoEdit(player));
+        const n = Math.max(1, Math.floor(count ?? 1));
+        return toCommandResult(n === 1 ? undoEdit(player) : massUndo(player, n));
     }
 };
 

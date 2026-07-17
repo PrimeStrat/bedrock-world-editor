@@ -284,7 +284,7 @@ function stampClipboardAlongPath(player, samples, spacing, skipAir) {
         return { ok: false, message: "Clipboard is empty. Use /we:copy first." };
     }
     const baseQuarters = quartersFor(clip.rotation);
-    const step = Math.max(1, Math.floor(spacing ?? clip.size.x));
+    const step = Math.max(1, spacing ?? clip.size.x);
     const range = player.dimension.heightRange;
     const stamps = [];
     let acc = step;

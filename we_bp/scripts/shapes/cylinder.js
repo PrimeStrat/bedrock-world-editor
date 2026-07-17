@@ -29,8 +29,9 @@ function cylinderVolume(radius, height) {
 function* cylinderRuns(center, radius, height, hollow) {
     const outer = radiusThreshold(radius);
     const inner = radius >= 1 ? radiusThreshold(radius - 1) : -1;
+    const reach = Math.ceil(radius);
     const disk = [];
-    for (let dz = -radius; dz <= radius; dz++) {
+    for (let dz = -reach; dz <= reach; dz++) {
         const ho = halfWidth(outer, 0, dz);
         if (ho < 0) {
             continue;

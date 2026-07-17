@@ -10,7 +10,7 @@ const pathCommand = {
         cheatsRequired: false,
         mandatoryParameters: [{ type: CustomCommandParamType.Enum, name: "we:pathaction" }],
         optionalParameters: [
-            { type: CustomCommandParamType.Integer, name: "size" },
+            { type: CustomCommandParamType.Float, name: "size" },
             { type: CustomCommandParamType.String, name: "block" },
             { type: CustomCommandParamType.Boolean, name: "skipAir" }
         ]

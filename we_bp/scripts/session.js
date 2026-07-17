@@ -198,6 +198,18 @@ function clearSelection(playerName) {
 }
 
 /**
+ * Empties a player's redo stack, discarding previously undone edits.
+ * @param {string} playerName The player's name.
+ * @returns {number} The number of records discarded.
+ */
+function clearRedo(playerName) {
+    const session = getSession(playerName);
+    const count = session.redo.length;
+    session.redo.length = 0;
+    return count;
+}
+
+/**
  * Empties a player's undo and redo stacks.
  * @param {string} playerName The player's name.
  * @returns {number} The number of records discarded.
@@ -357,4 +369,4 @@ function getHistory(playerName) {
     };
 }
 
-export { getSession, setPos1, setPos2, setPolygon, setPolyVertex, getPolygon, getSelection, clearSelection, clearHistory, pushUndo, discardUndo, popUndo, popRedo, takeUndo, takeRedo, pushUndoRecord, pushRedoRecord, getHistory, isBusy, setBusy };
+export { getSession, setPos1, setPos2, setPolygon, setPolyVertex, getPolygon, getSelection, clearSelection, clearHistory, clearRedo, pushUndo, discardUndo, popUndo, popRedo, takeUndo, takeRedo, pushUndoRecord, pushRedoRecord, getHistory, isBusy, setBusy };

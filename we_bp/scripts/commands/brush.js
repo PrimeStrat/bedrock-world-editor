@@ -26,7 +26,7 @@ function brushVariant(name, usePattern) {
             optionalParameters: [
                 { type: CustomCommandParamType.Enum, name: "we:brushshape" },
                 { type: usePattern ? CustomCommandParamType.String : CustomCommandParamType.BlockType, name: "block" },
-                { type: CustomCommandParamType.Integer, name: "radius" },
+                { type: CustomCommandParamType.Float, name: "radius" },
                 { type: CustomCommandParamType.Integer, name: "height" }
             ]
         },

@@ -10,8 +10,8 @@ const terrainCommand = {
         cheatsRequired: false,
         mandatoryParameters: [{ type: CustomCommandParamType.Enum, name: "we:terrainop" }],
         optionalParameters: [
-            { type: CustomCommandParamType.Integer, name: "radius" },
-            { type: CustomCommandParamType.Integer, name: "strength" }
+            { type: CustomCommandParamType.Float, name: "radius" },
+            { type: CustomCommandParamType.Float, name: "strength" }
         ]
     },
     handler(origin, mode, radius, strength) {

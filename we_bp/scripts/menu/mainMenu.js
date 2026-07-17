@@ -1,6 +1,6 @@
 import { system, Player } from "@minecraft/server";
 import { ActionFormData, ModalFormData } from "@minecraft/server-ui";
-import { getHistory } from "../session.js";
+import { getHistory, clearRedo } from "../session.js";
 import { showChestMenu } from "./chest.js";
 import { undoEdit, redoEdit, massUndo, massRedo, clearEditHistory } from "../actions/history.js";
 import { saveBrushPreset, deleteBrushPreset, setBrush, clearBrush, brushEntries, setTerrain } from "../actions/tools.js";
@@ -62,7 +62,7 @@ async function promptNewBrush(player) {
         .dropdown("Type", ["Sculpt - fill the shape (add mass)", "Paint - reskin the surface facing you", "Erase - carve a hole", "Gradient - surface, steps a #gradient", "Noise - fill, blocks in organic patches"], { defaultValueIndex: 0 })
         .dropdown("Shape", ["Sphere", "Cylinder", "Hollow sphere", "Hollow cylinder"], { defaultValueIndex: 0 })
         .textField("Block/pattern (or #gradient for gradient type)", "stone")
-        .slider("Radius", 1, 5, { valueStep: 1, defaultValue: 3 })
+        .slider("Radius", 0.5, 5, { valueStep: 0.5, defaultValue: 3 })
         .slider("Cylinder height", 1, 16, { valueStep: 1, defaultValue: 4 });
     const res = await form.show(player);
     if (res.canceled || !res.formValues) {
@@ -84,8 +84,8 @@ async function promptNewBrush(player) {
 async function promptTerrain(player) {
     const form = new ModalFormData().title("Terrain Builder")
         .dropdown("Mode", ["Raise", "Lower", "Flatten", "Smooth", "Extrude", "Roughen", "Distort"], { defaultValueIndex: 0 })
-        .slider("Radius", 1, 5, { valueStep: 1, defaultValue: 4 })
-        .slider("Strength", 1, 8, { valueStep: 1, defaultValue: 2 });
+        .slider("Radius", 0.5, 5, { valueStep: 0.5, defaultValue: 4 })
+        .slider("Strength", 0.5, 8, { valueStep: 0.5, defaultValue: 2 });
     const res = await form.show(player);
     if (res.canceled || !res.formValues) {
         return null;
@@ -213,14 +213,19 @@ async function openHistoryMenu(player, page) {
         const absolute = start + i;
         const seconds = Math.max(0, Math.round((now - item.record.tick) / 20));
         const state = item.redoable ? "§8(redoable)" : "§7#" + (absolute + 1);
-        const action = item.redoable ? "§aClick to redo up to here" : "§aClick to undo up to here";
+        const action = item.redoable ? "§aClick to redo up to here" : "§aClick to roll back to here";
         entries.push({
             slot: i,
             icon: historyIcon(item.record),
             hover: "§e§l" + item.record.label + "§r\n§7" + item.record.blocks + " block(s), " + seconds + "s ago " + state + "\n" + action,
             menu: true,
             run: (pl) => {
-                report(pl, item.redoable ? massRedo(pl, absolute - undoCount + 1) : massUndo(pl, absolute + 1));
+                if (item.redoable) {
+                    report(pl, massRedo(pl, absolute - undoCount + 1));
+                } else {
+                    clearRedo(pl.name);
+                    report(pl, massUndo(pl, absolute + 1));
+                }
                 return openHistoryMenu(pl, 0);
             }
         });

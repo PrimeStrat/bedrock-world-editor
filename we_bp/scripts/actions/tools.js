@@ -87,12 +87,13 @@ function storePresets(player, map) {
 }
 
 /**
- * Clamps a radius to the configured brush range.
+ * Clamps a radius to the configured brush range. Fractional radii are kept so
+ * a 2.5 brush sits between 2 and 3.
  * @param {number} radius The requested radius.
  * @returns {number} The clamped radius.
  */
 function clampRadius(radius) {
-    return Math.min(Math.max(1, Math.floor(radius)), WE_CONFIG.brushMaxRadius);
+    return Math.min(Math.max(0.5, radius), WE_CONFIG.brushMaxRadius);
 }
 
 /**
@@ -247,7 +248,7 @@ function brushEntries(player) {
  * @returns {ActionResult} The result.
  */
 function setTerrain(player, mode, radius, strength) {
-    const config = { mode, radius: clampRadius(radius), strength: Math.max(1, Math.floor(strength)) };
+    const config = { mode, radius: clampRadius(radius), strength: Math.max(0.5, strength) };
     savePlayerData(player, TERRAIN_KEY, config);
     ensureItem(player, TERRAIN_ITEM);
     return { ok: true, message: "§aTerrain Builder set to §f" + mode + "§a (radius " + config.radius + ", strength " + config.strength + "). Hold it and right-click terrain." };
@@ -486,10 +487,11 @@ function facingNormal(view) {
 function facingSurfaceRuns(dimension, target, radius, view) {
     const normal = facingNormal(view);
     const r2 = (radius + 0.5) * (radius + 0.5);
+    const reach = Math.ceil(radius);
     const runs = [];
-    for (let dx = -radius; dx <= radius; dx++) {
-        for (let dy = -radius; dy <= radius; dy++) {
-            for (let dz = -radius; dz <= radius; dz++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+        for (let dy = -reach; dy <= reach; dy++) {
+            for (let dz = -reach; dz <= reach; dz++) {
                 if (dx * dx + dy * dy + dz * dz > r2) {
                     continue;
                 }

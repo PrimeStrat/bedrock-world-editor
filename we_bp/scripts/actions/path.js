@@ -190,7 +190,8 @@ function buildPathSweep(player, blockText, radius) {
     if (!pattern) {
         return { ok: false, message: patternErrorMessage(blockText) };
     }
-    const r = Math.min(Math.max(1, Math.floor(radius)), MAX_SWEEP_RADIUS);
+    const r = Math.min(Math.max(0.5, radius), MAX_SWEEP_RADIUS);
+    const reach = Math.ceil(r);
     const samples = samplePath(points, 1);
     const r2 = (r + 0.5) * (r + 0.5);
     const cells = new Set();
@@ -200,9 +201,9 @@ function buildPathSweep(player, blockText, radius) {
         const cx = Math.round(sample.x);
         const cy = Math.round(sample.y);
         const cz = Math.round(sample.z);
-        for (let dx = -r; dx <= r; dx++) {
-            for (let dy = -r; dy <= r; dy++) {
-                for (let dz = -r; dz <= r; dz++) {
+        for (let dx = -reach; dx <= reach; dx++) {
+            for (let dy = -reach; dy <= reach; dy++) {
+                for (let dz = -reach; dz <= reach; dz++) {
                     if (dx * dx + dy * dy + dz * dz > r2) {
                         continue;
                     }
