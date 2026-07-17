@@ -54,7 +54,7 @@ const SECTIONS = [
             { cmd: "/we:paste [skipAir]", desc: "Paste at the same offset you copied from." },
             { cmd: "/we:rotate  /we:flip", desc: "Rotate or mirror the next paste." },
             { cmd: "/we:clearclipboard", desc: "Delete the saved copy." },
-            { cmd: "/we:path add", desc: "Set a path point at your feet; repeat to curve the path." },
+            { cmd: "/we:path add", desc: "Gives the Path Tool and sets a point at your feet. Click the Path Tool at blocks to add more; points never stack on one block." },
             { cmd: "/we:path paste [spacing]", desc: "Stamp your clipboard along the curve, rotated to follow it. Build the segment along the X axis (west to east)." },
             { cmd: "/we:path build [radius] [block]", desc: "Sweep a solid block tube along the curve instead." },
             { cmd: "/we:path clear | list", desc: "Forget or show the path points." }

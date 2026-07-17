@@ -8,11 +8,13 @@ import { runTerrainBrush } from "../operations/terrain.js";
 import { gradientConfig } from "./gradient.js";
 import { blockForFraction, gradientFraction } from "./gradmap.js";
 import { noisePermutation } from "./noise.js";
+import { pathToolClick } from "./path.js";
 import { getSelection } from "../session.js";
 import { loadPlayerData, savePlayerData } from "../persist.js";
 
 const BRUSH_ITEM = "we:brush";
 const TERRAIN_ITEM = "we:terrain_builder";
+const PATH_ITEM = "we:path_tool";
 const PRESET_KEY = "we:brushpresets";
 const EQUIP_KEY = "we:equipped";
 const TERRAIN_KEY = "we:terrainmode";
@@ -273,10 +275,14 @@ function terrainMode(player) {
  * @returns {void}
  */
 function beginStroke(player, itemId) {
-    if (itemId !== BRUSH_ITEM && itemId !== TERRAIN_ITEM) {
+    if (itemId !== BRUSH_ITEM && itemId !== TERRAIN_ITEM && itemId !== PATH_ITEM) {
         return;
     }
     if (player.getGameMode() !== GameMode.Creative || player.playerPermissionLevel !== PlayerPermissionLevel.Operator) {
+        return;
+    }
+    if (itemId === PATH_ITEM) {
+        pathToolClick(player);
         return;
     }
     endStroke(player.name);

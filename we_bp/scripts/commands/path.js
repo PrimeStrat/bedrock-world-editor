@@ -1,6 +1,7 @@
-import { CommandPermissionLevel, CustomCommandParamType } from "@minecraft/server";
+import { system, CommandPermissionLevel, CustomCommandParamType } from "@minecraft/server";
 import { getPlayer, toCommandResult, notPlayer } from "./common.js";
 import { addPathPoint, clearPathPoints, listPathPoints, buildPathSweep, pastePathStamps } from "../actions/path.js";
+import { ensureItem } from "../actions/tools.js";
 
 const pathCommand = {
     definition: {
@@ -21,6 +22,7 @@ const pathCommand = {
             return notPlayer();
         }
         if (action === "add") {
+            system.run(() => ensureItem(player, "we:path_tool"));
             return toCommandResult(addPathPoint(player));
         }
         if (action === "build") {

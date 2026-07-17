@@ -1,4 +1,5 @@
 import { world, system, Player } from "@minecraft/server";
+import { WE_CONFIG } from "../config.js";
 import { runShapeEdit } from "../operations/shape.js";
 import { stampClipboardAlongPath } from "../clipboard.js";
 import { spawnMarker } from "./marker.js";
@@ -120,11 +121,14 @@ function stopPreview(playerName) {
 }
 
 /**
- * Adds a path control point at the player's feet and previews the curve.
+ * Adds a path control point at a block location and previews the curve.
+ * Rejects a block that is already a control point so the curve never stacks
+ * points on one cell.
  * @param {Player} player The acting player.
+ * @param {{x: number, y: number, z: number}} loc The control point block.
  * @returns {ActionResult} The result.
  */
-function addPathPoint(player) {
+function addPathPointAt(player, loc) {
     let points = pathPoints.get(player.name);
     if (!points) {
         points = [];
@@ -133,11 +137,36 @@ function addPathPoint(player) {
     if (points.length >= MAX_PATH_POINTS) {
         return { ok: false, message: "§cPath cap reached (" + MAX_PATH_POINTS + " points)." };
     }
-    const loc = blockUnder(player);
-    points.push(loc);
+    if (points.some((p) => p.x === loc.x && p.y === loc.y && p.z === loc.z)) {
+        return { ok: false, message: "§cA path point is already on that block." };
+    }
+    points.push({ x: loc.x, y: loc.y, z: loc.z });
     system.run(() => renderPathPreview(player));
     const hint = points.length >= 2 ? " §7Build with /we:path build or paste." : " §7Add more to curve.";
     return { ok: true, message: "§aPath point §f" + points.length + "§a set at §f" + loc.x + " " + loc.y + " " + loc.z + "§a." + hint };
+}
+
+/**
+ * Adds a path control point at the player's feet and previews the curve.
+ * @param {Player} player The acting player.
+ * @returns {ActionResult} The result.
+ */
+function addPathPoint(player) {
+    return addPathPointAt(player, blockUnder(player));
+}
+
+/**
+ * Handles a Path Tool item click: adds a control point at the block the
+ * player looks at (or their feet when looking at nothing) and reports on the
+ * action bar.
+ * @param {Player} player The acting player.
+ * @returns {void}
+ */
+function pathToolClick(player) {
+    const hit = player.getBlockFromViewDirection({ maxDistance: WE_CONFIG.brushRange, includePassableBlocks: false });
+    const loc = hit ? hit.block.location : blockUnder(player);
+    const result = addPathPointAt(player, loc);
+    player.onScreenDisplay.setActionBar(result.message);
 }
 
 /**
@@ -292,4 +321,4 @@ function pastePathStamps(player, spacing, skipAir) {
     return { ok: result.ok, message: (result.ok ? "§a" : "§c") + result.message };
 }
 
-export { addPathPoint, clearPathPoints, listPathPoints, buildPathSweep, pastePathStamps };
+export { addPathPoint, pathToolClick, clearPathPoints, listPathPoints, buildPathSweep, pastePathStamps };

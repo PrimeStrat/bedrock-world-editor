@@ -4,6 +4,7 @@
     "texture_data": {
         "we_brush": { "textures": "textures/items/we_brush" },
         "we_terrain": { "textures": "textures/items/we_terrain" },
-        "we_guide": { "textures": "textures/items/we_guide" }
+        "we_guide": { "textures": "textures/items/we_guide" },
+        "we_path": { "textures": "textures/items/we_path" }
     }
 }
