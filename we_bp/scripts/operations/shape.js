@@ -222,7 +222,7 @@ function* fillBatch(dimension, areaMin, areaMax, runs, pattern, matchId, single,
                             allowed = cellMatchesFilter(block.typeId, matchId, includeAir);
                         }
                         if (allowed) {
-                            const placed = pickPatternPermutation(pattern);
+                            const placed = pickPatternPermutation(pattern, loc);
                             if (block.typeId !== placed.type.id) {
                                 dimension.setBlockPermutation(loc, placed);
                                 blocks += 1;

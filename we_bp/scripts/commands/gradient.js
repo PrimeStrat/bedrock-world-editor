@@ -5,7 +5,7 @@ import { startGradient, stopGradient, deleteGradient, listGradients } from "../a
 const gradientCommand = {
     definition: {
         name: "we:gradient",
-        description: "Gradient from inventory: start, stop, delete, list.",
+        description: "Palette tool: capture ordered layers from inventory.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false,
         mandatoryParameters: [{ type: CustomCommandParamType.Enum, name: "we:gradientaction" }],

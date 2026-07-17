@@ -76,11 +76,17 @@ function clampToHeight(dimension, min, max) {
 }
 
 /**
- * Picks a permutation from a fill pattern, weighted-random for mixes.
+ * Picks a permutation from a fill pattern. Gradient palettes carry a
+ * positional pick that lays ordered bands, so they are chosen by the cell's
+ * location; plain weighted mixes stay weighted-random.
  * @param {FillPattern} pattern The fill pattern.
+ * @param {Vec3} [loc] The cell being filled, used by positional palettes.
  * @returns {object} The chosen permutation.
  */
-function pickPatternPermutation(pattern) {
+function pickPatternPermutation(pattern, loc) {
+    if (pattern.pick && loc) {
+        return pattern.pick(loc.x, loc.y, loc.z);
+    }
     if (pattern.entries.length === 1) {
         return pattern.entries[0].permutation;
     }

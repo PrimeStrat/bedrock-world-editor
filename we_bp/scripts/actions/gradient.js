@@ -111,7 +111,7 @@ function stopGradient(player) {
     const map = loadGradients(player);
     map[pending.key] = { bands: scan.bands, type: pending.type, interp: pending.interp };
     storeGradients(player, map);
-    return { ok: true, message: "§aGradient §f#" + pending.key + "§a locked in: §b" + scan.label + "§a (" + pending.type + ", " + pending.interp + "). Use it with /we:brush <name> gradient sphere #" + pending.key + "§a." };
+    return { ok: true, message: "§aPalette §f#" + pending.key + "§a locked in: §b" + scan.label + "§a (" + pending.type + ", " + pending.interp + "). Use §f#" + pending.key + "§a as the block in any e-command or /we:ebrush - it always places as ordered layers." };
 }
 
 /**
@@ -221,21 +221,6 @@ function gradientBands(playerName, name) {
     return cfg ? cfg.bands : null;
 }
 
-/**
- * Resolves a "#name" gradient token to a weighted pattern string built from
- * its bands, for flat fills where spatial ordering does not apply.
- * @param {string} playerName The owning player's name.
- * @param {string} name The gradient name.
- * @returns {string|null} The weighted pattern string, or null.
- */
-function resolveGradient(playerName, name) {
-    const bands = gradientBands(playerName, name);
-    if (!bands) {
-        return null;
-    }
-    return bands.map((b) => b.weight + shortName(b.id)).join(",");
-}
-
-setGradientResolver(resolveGradient);
+setGradientResolver(gradientConfig);
 
 export { startGradient, stopGradient, deleteGradient, listGradients, gradientEntries, gradientBands, gradientConfig };

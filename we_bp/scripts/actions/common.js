@@ -2,6 +2,7 @@ import { BlockPermutation, BlockTypes, Player } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { getSelection, getPolygon, isBusy } from "../session.js";
 import { boxVolume } from "../operations/util.js";
+import { blockForFraction, gradientFraction } from "./gradmap.js";
 import { axisFromView } from "../clipboard.js";
 
 const DIRECTIONS = {
@@ -42,9 +43,10 @@ let gradientResolver = null;
 let patternPlayerName = "";
 
 /**
- * Registers a resolver that expands a "#name" gradient token for a player to a
- * weighted pattern string. Set once by the gradient module at load.
- * @param {function(string, string): string|null} resolver The (playerName, name) resolver.
+ * Registers a resolver that returns a player's gradient palette config
+ * (ordered bands, projection type, interpolation) for a "#name" token, or
+ * null when unknown. Set once by the gradient module at load.
+ * @param {function(string, string): {bands: {id: string, weight: number}[], type: string, interp: string}|null} resolver The (playerName, name) resolver.
  * @returns {void}
  */
 function setGradientResolver(resolver) {
@@ -62,28 +64,59 @@ function setPatternPlayer(playerName) {
 }
 
 /**
- * Expands a leading "#name" gradient token to the acting player's stored
- * weighted pattern string, or returns the text unchanged.
- * @param {string} text The pattern text.
- * @returns {string} The expanded text.
+ * Builds a layered fill pattern from a gradient palette: the pattern carries a
+ * per-cell pick that maps each block's position to an ordered band, so the
+ * palette always places as layers, never as a random mix. With a selection the
+ * bands run along pos1 to pos2 (planar) or radiate from pos1 (spherical);
+ * without one they repeat as horizontal layers, one block per weight unit.
+ * @param {string} name The gradient palette name (without the #).
+ * @returns {FillPattern|null} The layered pattern, or null when unknown.
  */
-function expandGradient(text) {
-    const trimmed = String(text).trim();
-    if (trimmed.startsWith("#") && gradientResolver && patternPlayerName) {
-        return gradientResolver(patternPlayerName, trimmed.slice(1).toLowerCase()) ?? trimmed;
+function gradientPattern(name) {
+    if (!gradientResolver || !patternPlayerName) {
+        return null;
     }
-    return trimmed;
+    const cfg = gradientResolver(patternPlayerName, name);
+    if (!cfg) {
+        return null;
+    }
+    const perms = new Map();
+    const entries = [];
+    let total = 0;
+    for (const band of cfg.bands) {
+        const permutation = BlockPermutation.resolve(band.id);
+        perms.set(band.id, permutation);
+        entries.push({ permutation, weight: band.weight });
+        total += band.weight;
+    }
+    const sel = getSelection(patternPlayerName);
+    const hasAxis = Boolean(sel.pos1 && sel.pos2);
+    const from = hasAxis ? { x: sel.pos1.x, y: sel.pos1.y, z: sel.pos1.z } : null;
+    const to = hasAxis ? { x: sel.pos2.x, y: sel.pos2.y, z: sel.pos2.z } : null;
+    const span = Math.max(1, total);
+    const pick = (x, y, z) => {
+        const t = hasAxis
+            ? gradientFraction({ x, y, z }, from, to, cfg.type)
+            : (((y % span) + span) % span) / span;
+        return perms.get(blockForFraction(cfg.bands, t, cfg.interp));
+    };
+    return { entries, total, label: "#" + name, pick };
 }
 
 /**
  * Parses a fill pattern: one block id, a weighted comma list like
  * "50stone,50cobblestone" ("50%stone" also works), or a "#name" gradient
- * token. Entries without a weight count as weight 1.
+ * palette (always layered, see gradientPattern). Entries without a weight
+ * count as weight 1.
  * @param {string} text The pattern text.
  * @returns {FillPattern|null} The pattern, or null when any entry is invalid.
  */
 function parsePattern(text) {
-    const parts = expandGradient(text).split(",");
+    const trimmed = String(text).trim();
+    if (trimmed.startsWith("#")) {
+        return gradientPattern(trimmed.slice(1).toLowerCase());
+    }
+    const parts = trimmed.split(",");
     const entries = [];
     const names = [];
     let total = 0;
@@ -113,7 +146,11 @@ function parsePattern(text) {
  * @returns {string} The failing entry, or the whole text.
  */
 function patternInvalidEntry(text) {
-    for (const part of expandGradient(text).split(",")) {
+    const trimmed = String(text).trim();
+    if (trimmed.startsWith("#")) {
+        return trimmed;
+    }
+    for (const part of trimmed.split(",")) {
         const match = part.trim().match(/^(?:(\d+)\s*%?\s*)?([a-z_][a-z0-9_:]*)$/i);
         if (!match || !resolveBlockId(match[2])) {
             return part.trim();
@@ -128,7 +165,11 @@ function patternInvalidEntry(text) {
  * @returns {string} The error message.
  */
 function patternErrorMessage(text) {
-    return "§cUnknown block in pattern: §b" + patternInvalidEntry(text) + "§c.";
+    const entry = patternInvalidEntry(text);
+    if (entry.startsWith("#")) {
+        return "§cNo gradient palette named §b" + entry + "§c. Make one with /we:gradient.";
+    }
+    return "§cUnknown block in pattern: §b" + entry + "§c.";
 }
 
 /**

@@ -104,7 +104,7 @@ function* brushFillJob(dimension, runs, pattern, includeAir, options, playerName
                 continue;
             }
             const before = block.permutation;
-            const placed = pickPatternPermutation(pattern);
+            const placed = pickPatternPermutation(pattern, loc);
             if (block.typeId === placed.type.id) {
                 continue;
             }

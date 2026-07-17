@@ -117,7 +117,7 @@ function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, mask
                                 allowed = cellMatchesFilter(block.typeId, matchId, includeAir);
                             }
                             if (allowed) {
-                                const placed = pickPatternPermutation(pattern);
+                                const placed = pickPatternPermutation(pattern, loc);
                                 if (block.typeId !== placed.type.id) {
                                     dimension.setBlockPermutation(loc, placed);
                                     changed += 1;

@@ -91,7 +91,7 @@ function* floodFillJob(dimension, start, pattern, limit, options, playerName) {
         if (!block || block.typeId !== matchId) {
             continue;
         }
-        const placed = pickPatternPermutation(pattern);
+        const placed = pickPatternPermutation(pattern, cell);
         if (block.typeId !== placed.type.id) {
             const before = block.permutation;
             dimension.setBlockPermutation(cell, placed);

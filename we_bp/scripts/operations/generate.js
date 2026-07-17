@@ -92,7 +92,7 @@ function* generateJob(dimension, min, max, evaluate, pattern, playerName, label,
                             continue;
                         }
                         const before = block.permutation;
-                        const placed = pickPatternPermutation(pattern);
+                        const placed = pickPatternPermutation(pattern, loc);
                         if (block.typeId === placed.type.id) {
                             continue;
                         }

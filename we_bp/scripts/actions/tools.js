@@ -117,6 +117,7 @@ function saveBrushPreset(player, name, brushType, shape, blockText, radius, heig
     if (key === "") {
         return { ok: false, message: "§cName the brush, e.g. /we:brush hills sculpt sphere stone 4." };
     }
+    setPatternPlayer(player.name);
     if (!allowPattern && (brushType === "gradient" || brushType === "noise")) {
         return { ok: false, message: "§c" + brushType + " brushes need a pattern - use §f/we:ebrush§c instead." };
     }

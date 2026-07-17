@@ -69,7 +69,8 @@ const SECTIONS = [
             { cmd: "/we:brushes", desc: "Open the brush menu." },
             { cmd: "/we:setbrush", desc: "Menu to equip a saved brush preset." },
             { cmd: "/we:clearbrush", desc: "Unequip the World Brush." },
-            { cmd: "/we:gradient start|stop|delete|list", desc: "Build an ordered gradient from your inventory blocks." }
+            { cmd: "/we:gradient start|stop|delete|list", desc: "Palette tool: capture an ordered block palette from your inventory (low to high, count widens a layer)." },
+            { cmd: "#<palette> as a block", desc: "In any e-command or /we:ebrush: always places as ordered layers along pos1->pos2, or repeating horizontal layers without a selection. Never a random mix." }
         ]
     },
     {

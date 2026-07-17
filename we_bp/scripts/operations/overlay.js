@@ -76,7 +76,7 @@ function* overlayJob(dimension, min, max, pattern, mask, playerName) {
                         const above = dimension.getBlock({ x, y: y + 1, z });
                         if (above && above.typeId === AIR_ID) {
                             const before = above.permutation;
-                            const placed = pickPatternPermutation(pattern);
+                            const placed = pickPatternPermutation(pattern, { x, y: y + 1, z });
                             dimension.setBlockPermutation({ x, y: y + 1, z }, placed);
                             changes.push({ location: { x, y: y + 1, z }, before, after: placed });
                         }
