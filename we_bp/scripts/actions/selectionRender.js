@@ -58,19 +58,12 @@ function edgePoints(a, b, perBlock, out) {
  * @returns {Vec3[]} The outline points.
  */
 function outlinePoints(min, max, polygon) {
-    const corners = [
-        { x: min.x, y: min.y, z: min.z }, { x: max.x, y: min.y, z: min.z },
-        { x: max.x, y: min.y, z: max.z }, { x: min.x, y: min.y, z: max.z },
-        { x: min.x, y: max.y, z: min.z }, { x: max.x, y: max.y, z: min.z },
-        { x: max.x, y: max.y, z: max.z }, { x: min.x, y: max.y, z: max.z }
-    ];
-    const boxEdges = [
-        [0, 1], [1, 2], [2, 3], [3, 0],
-        [4, 5], [5, 6], [6, 7], [7, 4],
-        [0, 4], [1, 5], [2, 6], [3, 7]
-    ];
-    const edges = boxEdges.map(([a, b]) => [corners[a], corners[b]]);
+    let edges;
     if (polygon && polygon.length >= 3) {
+        // A polygon selection outlines its actual prism: the top and bottom
+        // rings following the polygon vertices, plus vertical risers, never the
+        // enclosing bounding box.
+        edges = [];
         for (let i = 0; i < polygon.length; i++) {
             const a = polygon[i];
             const b = polygon[(i + 1) % polygon.length];
@@ -78,6 +71,19 @@ function outlinePoints(min, max, polygon) {
             edges.push([{ x: a.x, y: max.y, z: a.z }, { x: b.x, y: max.y, z: b.z }]);
             edges.push([{ x: a.x, y: min.y, z: a.z }, { x: a.x, y: max.y, z: a.z }]);
         }
+    } else {
+        const corners = [
+            { x: min.x, y: min.y, z: min.z }, { x: max.x, y: min.y, z: min.z },
+            { x: max.x, y: min.y, z: max.z }, { x: min.x, y: min.y, z: max.z },
+            { x: min.x, y: max.y, z: min.z }, { x: max.x, y: max.y, z: min.z },
+            { x: max.x, y: max.y, z: max.z }, { x: min.x, y: max.y, z: max.z }
+        ];
+        const boxEdges = [
+            [0, 1], [1, 2], [2, 3], [3, 0],
+            [4, 5], [5, 6], [6, 7], [7, 4],
+            [0, 4], [1, 5], [2, 6], [3, 7]
+        ];
+        edges = boxEdges.map(([a, b]) => [corners[a], corners[b]]);
     }
     let outlineBlocks = 0;
     for (const [a, b] of edges) {

@@ -7,6 +7,7 @@ import { reserveBoxUndoSlot, snapshotBoxTiles } from "./undo.js";
 import { runTrackedJob, chainJobs } from "./jobs.js";
 import { fallingBlockSweeper } from "./protect.js";
 import { mirrorBoxFor } from "../actions/symmetry.js";
+import { maskAllows, maskActive } from "../actions/mask.js";
 import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
 
 const CELLS_PER_YIELD = 256;
@@ -70,7 +71,7 @@ function runBoxEdit(player, dimension, min, max, pattern, matchId, includeAir, l
 function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, mask, outChanged, playerName) {
     const excludeId = pattern.entries.length === 1 ? pattern.entries[0].permutation.type.id : null;
     const blockFilter = blockFilterFor(matchId, includeAir, excludeId);
-    const single = pattern.entries.length === 1 && !matchId && !mask;
+    const single = pattern.entries.length === 1 && !matchId && !mask && !maskActive(playerName);
     const filtered = Boolean(matchId) || !includeAir;
     const sweep = fallingBlockSweeper(dimension, min, max);
     let changed = 0;
@@ -115,6 +116,9 @@ function* fillBoxChunked(dimension, min, max, pattern, matchId, includeAir, mask
                             let allowed = Boolean(block);
                             if (allowed && filtered) {
                                 allowed = cellMatchesFilter(block.typeId, matchId, includeAir);
+                            }
+                            if (allowed && !maskAllows(playerName, block.typeId)) {
+                                allowed = false;
                             }
                             if (allowed) {
                                 const placed = pickPatternPermutation(pattern, loc);

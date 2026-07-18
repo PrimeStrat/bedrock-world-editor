@@ -3,6 +3,7 @@ import { pushUndo, discardUndo } from "../session.js";
 import { AIR_ID, pickPatternPermutation } from "./util.js";
 import { runTrackedJob, chainJobs } from "./jobs.js";
 import { mirrorRunsFor } from "../actions/symmetry.js";
+import { maskAllows } from "../actions/mask.js";
 
 const BRUSH_CELLS_PER_YIELD = 512;
 
@@ -101,6 +102,9 @@ function* brushFillJob(dimension, runs, pattern, includeAir, options, playerName
                 continue;
             }
             if (options.surfaceOnly && block.typeId !== AIR_ID && !isSurfaceCell(dimension, loc)) {
+                continue;
+            }
+            if (!maskAllows(playerName, block.typeId)) {
                 continue;
             }
             const before = block.permutation;

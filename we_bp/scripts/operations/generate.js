@@ -4,6 +4,7 @@ import { chunkFloor, boxVolume, clampToHeight, pickPatternPermutation } from "./
 import { tickAreaFor, releaseTickArea, pickAreaSpan, areaFullyLoaded } from "./ticking.js";
 import { runTrackedJob } from "./jobs.js";
 import { fallingBlockSweeper } from "./protect.js";
+import { maskAllows } from "../actions/mask.js";
 import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
 
 const GEN_CELLS_PER_YIELD = 256;
@@ -89,6 +90,9 @@ function* generateJob(dimension, min, max, evaluate, pattern, playerName, label,
                         const loc = { x, y, z };
                         const block = dimension.getBlock(loc);
                         if (!block) {
+                            continue;
+                        }
+                        if (!maskAllows(playerName, block.typeId)) {
                             continue;
                         }
                         const before = block.permutation;

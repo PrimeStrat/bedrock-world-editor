@@ -3,6 +3,7 @@ import { pushUndo, discardUndo, setBusy } from "../session.js";
 import { AIR_ID, pickPatternPermutation } from "./util.js";
 import { runTrackedJob } from "./jobs.js";
 import { fallingBlockSweeper } from "./protect.js";
+import { maskAllows } from "../actions/mask.js";
 
 const FLOOD_CELLS_PER_YIELD = 512;
 
@@ -88,7 +89,7 @@ function* floodFillJob(dimension, start, pattern, limit, options, playerName) {
             continue;
         }
         const block = dimension.isChunkLoaded(cell) ? dimension.getBlock(cell) : undefined;
-        if (!block || block.typeId !== matchId) {
+        if (!block || block.typeId !== matchId || !maskAllows(playerName, block.typeId)) {
             continue;
         }
         const placed = pickPatternPermutation(pattern, cell);

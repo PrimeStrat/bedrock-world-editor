@@ -11,8 +11,11 @@ const PREVIEW_TICKS = 600;
 const PREVIEW_REDRAW_TICKS = 10;
 const MAX_PREVIEW_MARKERS = 300;
 
+const PATH_TRACE_INTERVAL_TICKS = 3;
+
 const pathPoints = new Map();
 const previews = new Map();
+const traces = new Map();
 
 /**
  * @typedef {{x: number, y: number, z: number}} Vec3
@@ -156,17 +159,60 @@ function addPathPoint(player) {
 }
 
 /**
- * Handles a Path Tool item click: adds a control point at the block the
- * player looks at (or their feet when looking at nothing) and reports on the
- * action bar.
+ * Adds a control point at the block the player looks at (feet fallback), if
+ * that block is not already a point. Silent on a duplicate so a held trace does
+ * not spam the action bar.
+ * @param {Player} player The acting player.
+ * @param {boolean} announce When true, report the result on the action bar.
+ * @returns {void}
+ */
+function pathToolAddLooked(player, announce) {
+    const hit = player.getBlockFromViewDirection({ maxDistance: WE_CONFIG.brushRange, includePassableBlocks: false });
+    const loc = hit ? hit.block.location : blockUnder(player);
+    const points = pathPoints.get(player.name);
+    if (points && points.some((p) => p.x === loc.x && p.y === loc.y && p.z === loc.z)) {
+        return;
+    }
+    const result = addPathPointAt(player, loc);
+    if (announce || !result.ok) {
+        player.onScreenDisplay.setActionBar(result.message);
+    }
+}
+
+/**
+ * Begins a Path Tool press: adds a point at the looked-at block immediately,
+ * then keeps adding looked-at blocks while the button is held, skipping any
+ * block that is already a point. Called from itemStartUse.
  * @param {Player} player The acting player.
  * @returns {void}
  */
-function pathToolClick(player) {
-    const hit = player.getBlockFromViewDirection({ maxDistance: WE_CONFIG.brushRange, includePassableBlocks: false });
-    const loc = hit ? hit.block.location : blockUnder(player);
-    const result = addPathPointAt(player, loc);
-    player.onScreenDisplay.setActionBar(result.message);
+function pathToolStart(player) {
+    pathToolEnd(player.name);
+    pathToolAddLooked(player, true);
+    const playerName = player.name;
+    const intervalId = system.runInterval(() => {
+        const acting = world.getAllPlayers().find((p) => p.name === playerName);
+        if (!acting) {
+            pathToolEnd(playerName);
+            return;
+        }
+        pathToolAddLooked(acting, false);
+    }, PATH_TRACE_INTERVAL_TICKS);
+    traces.set(playerName, intervalId);
+}
+
+/**
+ * Ends a Path Tool held trace, if any. Called from itemStopUse and
+ * itemReleaseUse.
+ * @param {string} playerName The acting player's name.
+ * @returns {void}
+ */
+function pathToolEnd(playerName) {
+    const id = traces.get(playerName);
+    if (id !== undefined) {
+        system.clearRun(id);
+        traces.delete(playerName);
+    }
 }
 
 /**
@@ -321,4 +367,4 @@ function pastePathStamps(player, spacing, skipAir) {
     return { ok: result.ok, message: (result.ok ? "§a" : "§c") + result.message };
 }
 
-export { addPathPoint, pathToolClick, clearPathPoints, listPathPoints, buildPathSweep, pastePathStamps };
+export { addPathPoint, pathToolStart, pathToolEnd, clearPathPoints, listPathPoints, buildPathSweep, pastePathStamps };

@@ -8,7 +8,7 @@ import { runTerrainBrush } from "../operations/terrain.js";
 import { gradientConfig } from "./gradient.js";
 import { blockForFraction, gradientFraction } from "./gradmap.js";
 import { noisePermutation } from "./noise.js";
-import { pathToolClick } from "./path.js";
+import { pathToolStart, pathToolEnd } from "./path.js";
 import { getSelection } from "../session.js";
 import { loadPlayerData, savePlayerData } from "../persist.js";
 
@@ -282,7 +282,7 @@ function beginStroke(player, itemId) {
         return;
     }
     if (itemId === PATH_ITEM) {
-        pathToolClick(player);
+        pathToolStart(player);
         return;
     }
     endStroke(player.name);
@@ -310,6 +310,7 @@ function endStroke(playerName) {
         system.clearRun(id);
         strokes.delete(playerName);
     }
+    pathToolEnd(playerName);
 }
 
 /**

@@ -5,6 +5,7 @@ import { AIR_ID, chunkFloor, pickPatternPermutation } from "./util.js";
 import { tickAreaFor, releaseTickArea, pickAreaSpan } from "./ticking.js";
 import { runTrackedJob, chainJobs } from "./jobs.js";
 import { mirrorBoxFor } from "../actions/symmetry.js";
+import { maskAllows } from "../actions/mask.js";
 
 /**
  * @typedef {{x: number, y: number, z: number}} Vec3
@@ -72,6 +73,9 @@ function* overlayJob(dimension, min, max, pattern, mask, playerName) {
                         }
                         if (!block || block.typeId === AIR_ID) {
                             continue;
+                        }
+                        if (!maskAllows(playerName, block.typeId)) {
+                            break;
                         }
                         const above = dimension.getBlock({ x, y: y + 1, z });
                         if (above && above.typeId === AIR_ID) {

@@ -6,6 +6,7 @@ import { reserveBoxUndoSlot, snapshotRunTiles } from "./undo.js";
 import { runTrackedJob, chainJobs } from "./jobs.js";
 import { fallingBlockSweeper } from "./protect.js";
 import { mirrorBoxFor, mirrorRunsFor } from "../actions/symmetry.js";
+import { maskAllows, maskActive } from "../actions/mask.js";
 import { debugStart, debugProgress, debugEnd, debugSkipped } from "./debug.js";
 
 const RUNS_PER_YIELD = 256;
@@ -104,8 +105,9 @@ function maskRuns(runs, mask) {
 function* fillRunsChunked(dimension, runs, bboxMin, bboxMax, pattern, matchId, nativeMatch, includeAir, outChanged, playerName) {
     const excludeId = pattern.entries.length === 1 ? pattern.entries[0].permutation.type.id : null;
     const blockFilter = blockFilterFor(matchId, includeAir, excludeId);
-    const single = pattern.entries.length === 1 && (!matchId || nativeMatch);
-    const singlePlaced = !single && pattern.entries.length === 1;
+    const masked = maskActive(playerName);
+    const single = pattern.entries.length === 1 && (!matchId || nativeMatch) && !masked;
+    const singlePlaced = !single && pattern.entries.length === 1 && !masked;
     const placedPermutation = pattern.entries.length === 1 ? pattern.entries[0].permutation : null;
     const placedId = placedPermutation ? placedPermutation.type.id : null;
     const filtered = Boolean(matchId) || !includeAir;
@@ -220,6 +222,9 @@ function* fillBatch(dimension, areaMin, areaMax, runs, pattern, matchId, single,
                         let allowed = Boolean(block);
                         if (allowed && filtered) {
                             allowed = cellMatchesFilter(block.typeId, matchId, includeAir);
+                        }
+                        if (allowed && !maskAllows(playerName, block.typeId)) {
+                            allowed = false;
                         }
                         if (allowed) {
                             const placed = pickPatternPermutation(pattern, loc);
