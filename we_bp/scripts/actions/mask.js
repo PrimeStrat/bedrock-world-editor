@@ -4,8 +4,10 @@ import { WOOL, CONCRETE, CONCRETE_POWDER, GLASS, TERRACOTTA, LOGS, PLANKS, LEAVE
 import { loadPlayerData, savePlayerData } from "../persist.js";
 
 const MASK_KEY = "we:mask";
+const SAVED_KEY = "we:savedmasks";
 const AIR_ID = "minecraft:air";
 const maskCache = new Map();
+const savedCache = new Map();
 
 /**
  * @typedef {{ok: boolean, message: string}} ActionResult
@@ -127,6 +129,120 @@ function maskStatus(player) {
 }
 
 /**
+ * Loads a player's saved-mask map (name to MaskDef) into the cache.
+ * @param {Player} player The owning player.
+ * @returns {Object<string, MaskDef>} The name-to-mask map.
+ */
+function loadSavedMasks(player) {
+    let map = savedCache.get(player.name);
+    if (!map) {
+        map = loadPlayerData(player, SAVED_KEY, {});
+        savedCache.set(player.name, map);
+    }
+    return map;
+}
+
+/**
+ * Persists a player's saved-mask map and refreshes the cache.
+ * @param {Player} player The owning player.
+ * @param {Object<string, MaskDef>} map The name-to-mask map.
+ * @returns {void}
+ */
+function storeSavedMasks(player, map) {
+    savedCache.set(player.name, map);
+    savePlayerData(player, SAVED_KEY, Object.keys(map).length > 0 ? map : undefined);
+}
+
+/**
+ * Saves the player's active mask under a name for later reuse.
+ * @param {Player} player The acting player.
+ * @param {string} name The mask name.
+ * @returns {ActionResult} The result.
+ */
+function saveMask(player, name) {
+    const key = String(name ?? "").trim().toLowerCase();
+    if (key === "") {
+        return { ok: false, message: "§cName the mask, e.g. /we:mask save mymask." };
+    }
+    const def = loadMask(player);
+    if (!def) {
+        return { ok: false, message: "§cNo active mask to save. Set one first." };
+    }
+    const map = loadSavedMasks(player);
+    map[key] = def;
+    storeSavedMasks(player, map);
+    return { ok: true, message: "§aSaved mask §f" + key + "§a: §7" + def.label + "§a." };
+}
+
+/**
+ * Loads a saved mask as the active mask.
+ * @param {Player} player The acting player.
+ * @param {string} name The mask name.
+ * @returns {ActionResult} The result.
+ */
+function loadSavedMask(player, name) {
+    const key = String(name ?? "").trim().toLowerCase();
+    const def = loadSavedMasks(player)[key];
+    if (!def) {
+        return { ok: false, message: "§cNo saved mask named §f" + key + "§c. See /we:mask list." };
+    }
+    maskCache.set(player.name, def);
+    savePlayerData(player, MASK_KEY, def);
+    return { ok: true, message: "§aMask set to §f" + key + "§a: §7" + def.label + "§a." };
+}
+
+/**
+ * Deletes a saved mask.
+ * @param {Player} player The acting player.
+ * @param {string} name The mask name.
+ * @returns {ActionResult} The result.
+ */
+function deleteSavedMask(player, name) {
+    const key = String(name ?? "").trim().toLowerCase();
+    const map = loadSavedMasks(player);
+    if (!(key in map)) {
+        return { ok: false, message: "§cNo saved mask named §f" + key + "§c." };
+    }
+    delete map[key];
+    storeSavedMasks(player, map);
+    return { ok: true, message: "§aSaved mask §f" + key + "§a deleted." };
+}
+
+/**
+ * Returns a player's saved masks as name-and-detail entries.
+ * @param {Player} player The owning player.
+ * @returns {{name: string, label: string}[]} The saved mask entries.
+ */
+function savedMaskEntries(player) {
+    const map = loadSavedMasks(player);
+    return Object.keys(map).map((name) => ({ name, label: map[name].label }));
+}
+
+/**
+ * Lists the preset masks, the player's saved masks, and the active mask.
+ * @param {Player} player The acting player.
+ * @returns {ActionResult} The result.
+ */
+function listMasks(player) {
+    const lines = ["§6Presets"];
+    for (const key of Object.keys(PRESETS)) {
+        lines.push("§f  " + key + " §7- " + PRESETS[key].label);
+    }
+    const saved = savedMaskEntries(player);
+    lines.push("§6Saved");
+    if (saved.length === 0) {
+        lines.push("§7  none - set a mask then /we:mask save <name>");
+    } else {
+        for (const entry of saved) {
+            lines.push("§f  " + entry.name + " §7- " + entry.label);
+        }
+    }
+    const active = loadMask(player);
+    lines.push("§6Active: §f" + (active ? active.label : "none"));
+    return { ok: true, message: lines.join("\n") };
+}
+
+/**
  * Returns the player's active mask definition, loading it on a cache miss.
  * @param {string} playerName The acting player's name.
  * @returns {MaskDef|null} The mask definition, or null.
@@ -172,4 +288,4 @@ function maskAllows(playerName, typeId) {
     return preset.ids ? preset.ids.has(typeId) : typeId !== AIR_ID;
 }
 
-export { maskPresetNames, setBlockMask, setPresetMask, clearMask, maskStatus, maskAllows, maskActive };
+export { maskPresetNames, setBlockMask, setPresetMask, clearMask, maskStatus, saveMask, loadSavedMask, deleteSavedMask, savedMaskEntries, listMasks, maskAllows, maskActive };

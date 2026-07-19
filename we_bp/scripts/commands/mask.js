@@ -1,28 +1,44 @@
 import { CommandPermissionLevel, CustomCommandParamType } from "@minecraft/server";
 import { getPlayer, toCommandResult, notPlayer } from "./common.js";
-import { setBlockMask, setPresetMask, clearMask, maskStatus } from "../actions/mask.js";
+import { setBlockMask, setPresetMask, clearMask, maskStatus, saveMask, loadSavedMask, deleteSavedMask, listMasks } from "../actions/mask.js";
 
 const CLEAR_WORDS = ["off", "none", "clear"];
 
 const maskCommand = {
     definition: {
         name: "we:mask",
-        description: "Limit edits to given blocks. No arg shows the mask.",
+        description: "Mask edits to blocks; save, load, list, off.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false,
-        optionalParameters: [{ type: CustomCommandParamType.String, name: "blocks" }]
+        optionalParameters: [
+            { type: CustomCommandParamType.String, name: "blocks" },
+            { type: CustomCommandParamType.String, name: "name" }
+        ]
     },
-    handler(origin, blocks) {
+    handler(origin, blocks, name) {
         const player = getPlayer(origin);
         if (!player) {
             return notPlayer();
         }
         const text = String(blocks ?? "").trim();
+        const word = text.toLowerCase();
         if (text === "") {
             return toCommandResult(maskStatus(player));
         }
-        if (CLEAR_WORDS.includes(text.toLowerCase())) {
+        if (word === "list") {
+            return toCommandResult(listMasks(player));
+        }
+        if (CLEAR_WORDS.includes(word)) {
             return toCommandResult(clearMask(player));
+        }
+        if (word === "save") {
+            return toCommandResult(saveMask(player, name));
+        }
+        if (word === "load") {
+            return toCommandResult(loadSavedMask(player, name));
+        }
+        if (word === "delete") {
+            return toCommandResult(deleteSavedMask(player, name));
         }
         return toCommandResult(setBlockMask(player, text));
     }
