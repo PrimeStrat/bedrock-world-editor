@@ -1,10 +1,10 @@
-import { world, BlockTypes, Player } from "@minecraft/server";
+import { world, Player } from "@minecraft/server";
 import { resolveBlockId, shortName } from "./common.js";
-// BlockTypes.getAll() is a native call, so preset id sets are built lazily on
-// first mask use (never at module-eval / early execution).
+import { WOOL, CONCRETE, CONCRETE_POWDER, GLASS, TERRACOTTA, LOGS, PLANKS, LEAVES, FOLIAGE, STONE, DIRT, SAND, ORE, LIQUID } from "../data/blockCategories.js";
 import { loadPlayerData, savePlayerData } from "../persist.js";
 
 const MASK_KEY = "we:mask";
+const AIR_ID = "minecraft:air";
 const maskCache = new Map();
 
 /**
@@ -13,59 +13,27 @@ const maskCache = new Map();
  */
 
 /**
- * Axiom-style preset masks: each names a category and a rule that decides,
- * for a real Bedrock block id, whether it belongs. The rule is run once over
- * the live block registry (BlockTypes.getAll) to build an explicit id set, so
- * matching is a direct membership test against every block the game actually
- * has rather than a live substring guess. Fixed exact-id sets cover categories
- * that suffix rules would over-match.
+ * Axiom-style preset masks: each names a category backed by a verbatim block
+ * id set from the block-categories data file, so matching is a direct
+ * membership test with no substring rules. non_air is the one exception, an
+ * "any block but air" predicate rather than a list.
  */
-const STONE_IDS = new Set(["stone", "cobblestone", "mossy_cobblestone", "granite", "polished_granite", "diorite", "polished_diorite", "andesite", "polished_andesite", "deepslate", "cobbled_deepslate", "polished_deepslate", "tuff", "calcite", "dripstone_block", "blackstone", "polished_blackstone", "gilded_blackstone", "basalt", "smooth_basalt", "polished_basalt", "end_stone", "netherrack"]);
-const DIRT_IDS = new Set(["dirt", "grass_block", "coarse_dirt", "rooted_dirt", "podzol", "mycelium", "mud", "muddy_mangrove_roots", "farmland", "dirt_with_roots"]);
-const SAND_IDS = new Set(["sand", "red_sand", "gravel", "soul_sand", "soul_soil", "suspicious_sand", "suspicious_gravel"]);
-const LIQUID_IDS = new Set(["water", "flowing_water", "lava", "flowing_lava"]);
-
 const PRESETS = {
-    all_wool: { label: "all wool", rule: (id) => id === "white_wool" || id.endsWith("_wool") },
-    all_foliage: { label: "all foliage", rule: (id) => id.endsWith("_leaves") || id.endsWith("_sapling") || id.endsWith("_flower") || id.endsWith("_mushroom") || /^(oak_leaves|grass|tall_grass|fern|large_fern|dead_bush|vine|weeping_vines|twisting_vines|lily_pad|kelp|seagrass|bamboo|sugar_cane|azalea|flowering_azalea|moss_block|moss_carpet|sea_pickle|hanging_roots|spore_blossom|pink_petals|nether_sprouts|crimson_roots|warped_roots|red_mushroom|brown_mushroom|cactus|dandelion|poppy|blue_orchid|allium|azure_bluet|oxeye_daisy|cornflower|lily_of_the_valley|wither_rose|sunflower|lilac|rose_bush|peony)$/.test(id) },
-    all_leaves: { label: "all leaves", rule: (id) => id.endsWith("_leaves") },
-    all_logs: { label: "all logs", rule: (id) => id.endsWith("_log") || id.endsWith("_wood") || id.endsWith("_stem") || id.endsWith("_hyphae") || id.startsWith("stripped_") },
-    all_planks: { label: "all planks", rule: (id) => id.endsWith("_planks") },
-    all_stone: { label: "all stone", rule: (id) => STONE_IDS.has(id) },
-    all_dirt: { label: "all dirt", rule: (id) => DIRT_IDS.has(id) },
-    all_ore: { label: "all ore", rule: (id) => id.endsWith("_ore") || id === "ancient_debris" },
-    all_glass: { label: "all glass", rule: (id) => id === "glass" || id === "glass_pane" || id.endsWith("_stained_glass") || id.endsWith("_stained_glass_pane") || id === "tinted_glass" },
-    all_concrete: { label: "all concrete", rule: (id) => id.endsWith("_concrete") || id.endsWith("_concrete_powder") },
-    all_terracotta: { label: "all terracotta", rule: (id) => id === "hardened_clay" || id === "terracotta" || id.endsWith("_terracotta") || id.endsWith("_glazed_terracotta") },
-    all_liquid: { label: "all liquid", rule: (id) => LIQUID_IDS.has(id) },
-    all_sand: { label: "all sand", rule: (id) => SAND_IDS.has(id) },
-    non_air: { label: "non-air (any solid)", rule: (id) => id !== "air" }
+    all_wool: { label: "all wool", ids: new Set(WOOL) },
+    all_foliage: { label: "all foliage", ids: new Set(FOLIAGE) },
+    all_leaves: { label: "all leaves", ids: new Set(LEAVES) },
+    all_logs: { label: "all logs", ids: new Set(LOGS) },
+    all_planks: { label: "all planks", ids: new Set(PLANKS) },
+    all_stone: { label: "all stone", ids: new Set(STONE) },
+    all_dirt: { label: "all dirt", ids: new Set(DIRT) },
+    all_ore: { label: "all ore", ids: new Set(ORE) },
+    all_glass: { label: "all glass", ids: new Set(GLASS) },
+    all_concrete: { label: "all concrete", ids: new Set(CONCRETE.concat(CONCRETE_POWDER)) },
+    all_terracotta: { label: "all terracotta", ids: new Set(TERRACOTTA) },
+    all_liquid: { label: "all liquid", ids: new Set(LIQUID) },
+    all_sand: { label: "all sand", ids: new Set(SAND) },
+    non_air: { label: "non-air (any solid)", ids: null }
 };
-
-/** @type {Map<string, Set<string>>} */
-const presetIds = new Map();
-
-/**
- * Builds and caches the explicit full-id set for a preset by running its rule
- * over the live block registry once. Grabbing the ids from BlockTypes means the
- * mask lists exactly the blocks this world has, not a hardcoded guess.
- * @param {string} preset The preset name.
- * @returns {Set<string>} The full block ids in the category.
- */
-function presetIdSet(preset) {
-    let set = presetIds.get(preset);
-    if (!set) {
-        const rule = PRESETS[preset].rule;
-        set = new Set();
-        for (const type of BlockTypes.getAll()) {
-            if (rule(shortName(type.id))) {
-                set.add(type.id);
-            }
-        }
-        presetIds.set(preset, set);
-    }
-    return set;
-}
 
 /**
  * Returns the preset mask names, for the command enum and menus.
@@ -197,7 +165,11 @@ function maskAllows(playerName, typeId) {
     if (def.kind === "blocks") {
         return def.value.split(",").includes(typeId);
     }
-    return PRESETS[def.value] ? presetIdSet(def.value).has(typeId) : true;
+    const preset = PRESETS[def.value];
+    if (!preset) {
+        return true;
+    }
+    return preset.ids ? preset.ids.has(typeId) : typeId !== AIR_ID;
 }
 
 export { maskPresetNames, setBlockMask, setPresetMask, clearMask, maskStatus, maskAllows, maskActive };
