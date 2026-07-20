@@ -2,45 +2,42 @@ import { CommandPermissionLevel, CustomCommandParamType } from "@minecraft/serve
 import { getPlayer, toCommandResult, notPlayer } from "./common.js";
 import { setBlockMask, setPresetMask, clearMask, maskStatus, saveMask, loadSavedMask, deleteSavedMask, listMasks } from "../actions/mask.js";
 
-const CLEAR_WORDS = ["off", "none", "clear"];
-
 const maskCommand = {
     definition: {
         name: "we:mask",
-        description: "Mask edits to blocks; save, load, list, off.",
+        description: "Mask edits: set, save, load, delete, list, off.",
         permissionLevel: CommandPermissionLevel.Admin,
         cheatsRequired: false,
-        optionalParameters: [
-            { type: CustomCommandParamType.String, name: "blocks" },
-            { type: CustomCommandParamType.String, name: "name" }
-        ]
+        mandatoryParameters: [{ type: CustomCommandParamType.Enum, name: "we:maskaction" }],
+        optionalParameters: [{ type: CustomCommandParamType.String, name: "arg" }]
     },
-    handler(origin, blocks, name) {
+    handler(origin, action, arg) {
         const player = getPlayer(origin);
         if (!player) {
             return notPlayer();
         }
-        const text = String(blocks ?? "").trim();
-        const word = text.toLowerCase();
-        if (text === "") {
+        if (action === "status") {
             return toCommandResult(maskStatus(player));
         }
-        if (word === "list") {
+        if (action === "list") {
             return toCommandResult(listMasks(player));
         }
-        if (CLEAR_WORDS.includes(word)) {
+        if (action === "off") {
             return toCommandResult(clearMask(player));
         }
-        if (word === "save") {
-            return toCommandResult(saveMask(player, name));
+        if (arg === undefined || String(arg).trim() === "") {
+            return toCommandResult({ ok: false, message: "§cUsage: /we:mask " + action + " <" + (action === "set" ? "blocks" : "name") + ">" });
         }
-        if (word === "load") {
-            return toCommandResult(loadSavedMask(player, name));
+        if (action === "save") {
+            return toCommandResult(saveMask(player, arg));
         }
-        if (word === "delete") {
-            return toCommandResult(deleteSavedMask(player, name));
+        if (action === "load") {
+            return toCommandResult(loadSavedMask(player, arg));
         }
-        return toCommandResult(setBlockMask(player, text));
+        if (action === "delete") {
+            return toCommandResult(deleteSavedMask(player, arg));
+        }
+        return toCommandResult(setBlockMask(player, arg));
     }
 };
 

@@ -109,9 +109,9 @@ const SECTIONS = [
         title: "Utility & Navigation",
         intro: "Quick tools that act around you or move you.",
         entries: [
-            { cmd: "/we:mask <blocks>", desc: "Limit every edit to those blocks (comma list, e.g. stone,dirt,gravel). 'off' clears; no arg shows it." },
+            { cmd: "/we:mask set <blocks>", desc: "Limit every edit to those blocks (comma list, e.g. stone,dirt,gravel)." },
             { cmd: "/we:mask save|load|delete <name>", desc: "Save the active mask, load a saved one, or delete it." },
-            { cmd: "/we:mask list", desc: "Show presets, your saved masks, and the active mask." },
+            { cmd: "/we:mask list | status | off", desc: "List presets+saved masks, show the active mask, or clear it." },
             { cmd: "/we:emask <preset>", desc: "Limit edits to a preset: all_wool, all_foliage, all_logs, all_stone, all_ore, all_glass, and more." },
             { cmd: "/we:removenear /we:replacenear", desc: "Edit a block type within a radius (max 64)." },
             { cmd: "/we:drain", desc: "Remove nearby liquids." },
@@ -127,6 +127,7 @@ const SECTIONS = [
             { cmd: "/we:history  /we:clearhistory", desc: "View or clear your edit history." },
             { cmd: "/we:symmetry", desc: "Mirror or radial-repeat your building." },
             { cmd: "/we:cancel", desc: "Stop a running edit." },
+            { cmd: "/we:tool <name>", desc: "Just give an editor item: brush, terrain, path, guide, or wand." },
             { cmd: "/we:book", desc: "Get this guide book." }
         ]
     }

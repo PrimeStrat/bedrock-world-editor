@@ -61,6 +61,7 @@ import { floodFillCommand } from "./floodfill.js";
 import { bookCommand } from "./book.js";
 import { pathCommand } from "./path.js";
 import { maskCommand, emaskCommand } from "./mask.js";
+import { toolCommand, toolItemNames } from "./tool.js";
 import { posCommand } from "./pos.js";
 import { maskPresetNames } from "../actions/mask.js";
 
@@ -145,6 +146,7 @@ const COMMANDS = [
     pathCommand,
     maskCommand,
     emaskCommand,
+    toolCommand,
     posCommand
 ];
 
@@ -167,7 +169,9 @@ function registerCommands(registry) {
     registry.registerEnum("we:smoothmode", ["stable", "melt", "grow"]);
     registry.registerEnum("we:pathcurve", ["line", "arch", "catenary", "bezier"]);
     registry.registerEnum("we:pathaction", ["add", "build", "paste", "clear", "list"]);
+    registry.registerEnum("we:maskaction", ["set", "save", "load", "delete", "list", "status", "off"]);
     registry.registerEnum("we:maskpreset", maskPresetNames());
+    registry.registerEnum("we:toolitem", toolItemNames());
     registry.registerEnum("we:pathshape", ["deck", "tube"]);
     for (const command of COMMANDS) {
         registry.registerCommand(command.definition, command.handler);
