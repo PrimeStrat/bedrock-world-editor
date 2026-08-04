@@ -1,4 +1,4 @@
-import { system, EquipmentSlot, GameMode, ItemStack, Player, PlayerPermissionLevel } from "@minecraft/server";
+import { world, system, EquipmentSlot, GameMode, ItemStack, Player, PlayerPermissionLevel } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { parsePattern, patternErrorMessage, setPatternPlayer, shortName } from "./common.js";
 import { sphereRuns } from "../shapes/sphere.js";
@@ -42,10 +42,12 @@ function heldItemId(player) {
 
 /**
  * Gives the player one of an item if their inventory holds none, so a setter
- * command always leaves them with the tool it configures.
+ * command always leaves them with the tool it configures. The actual give is
+ * deferred a tick because addItem is a mutating native call that cannot run in
+ * a command handler's restricted execution context.
  * @param {Player} player The player.
  * @param {string} itemId The item id to ensure.
- * @returns {boolean} True when an item was newly given.
+ * @returns {boolean} True when a give was scheduled (the player lacked the item).
  */
 function ensureItem(player, itemId) {
     const inv = player.getComponent("minecraft:inventory");
@@ -59,7 +61,14 @@ function ensureItem(player, itemId) {
             return false;
         }
     }
-    container.addItem(new ItemStack(itemId, 1));
+    const playerName = player.name;
+    system.run(() => {
+        const fresh = world.getAllPlayers().find((p) => p.name === playerName);
+        const container2 = fresh ? fresh.getComponent("minecraft:inventory")?.container : undefined;
+        if (container2) {
+            container2.addItem(new ItemStack(itemId, 1));
+        }
+    });
     return true;
 }
 
