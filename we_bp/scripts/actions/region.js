@@ -135,11 +135,13 @@ function placeCenter(player, blockText) {
 }
 
 /**
- * Replaces the interior of the selection with air, leaving a one-block shell.
+ * Replaces the interior of the selection with air, leaving a shell of the given
+ * thickness (WorldEdit //hollow <thickness>, default 1).
  * @param {Player} player The acting player.
+ * @param {number} thickness The shell thickness in blocks.
  * @returns {ActionResult} The result.
  */
-function hollowSelection(player) {
+function hollowSelection(player, thickness) {
     const region = requireRegion(player);
     if (!region.ok) {
         return region;
@@ -147,10 +149,11 @@ function hollowSelection(player) {
     if (region.mask) {
         return { ok: false, message: "§cHollow needs a box selection, not a polygon." };
     }
-    const min = { x: region.min.x + 1, y: region.min.y + 1, z: region.min.z + 1 };
-    const max = { x: region.max.x - 1, y: region.max.y - 1, z: region.max.z - 1 };
+    const t = Math.max(1, Math.floor(thickness ?? 1));
+    const min = { x: region.min.x + t, y: region.min.y + t, z: region.min.z + t };
+    const max = { x: region.max.x - t, y: region.max.y - t, z: region.max.z - t };
     if (min.x > max.x || min.y > max.y || min.z > max.z) {
-        return { ok: false, message: "§cSelection too thin to hollow." };
+        return { ok: false, message: "§cSelection too thin to hollow at thickness " + t + "." };
     }
     runBoxEdit(player, player.dimension, min, max, parsePattern(AIR_ID), null, true, "Hollow");
     return { ok: true, message: "§aHollow started..." };

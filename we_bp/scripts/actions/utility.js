@@ -1,9 +1,11 @@
 import { Player } from "@minecraft/server";
 import { WE_CONFIG } from "../config.js";
 import { runShapeEdit } from "../operations/shape.js";
+import { runBoxEdit } from "../operations/box.js";
 import { runFloodFill } from "../operations/floodfill.js";
+import { runDistribution } from "../operations/count.js";
 import { sphereRuns } from "../shapes/sphere.js";
-import { AIR_ID, resolveBlockId, parsePattern, patternErrorMessage, setPatternPlayer, busyGuard, blockUnder, shortName } from "./common.js";
+import { AIR_ID, resolveBlockId, parsePattern, patternErrorMessage, setPatternPlayer, busyGuard, blockUnder, requireRegion, shortName } from "./common.js";
 import { ensureItem } from "./tools.js";
 
 const LIQUID_IDS = ["minecraft:water", "minecraft:flowing_water", "minecraft:lava", "minecraft:flowing_lava"];
@@ -132,4 +134,69 @@ function floodFill(player, blockText, limit, horizontal, up, down, corners) {
     return { ok: true, message: "§aFlood filling from §f" + hit.block.location.x + " " + hit.block.location.y + " " + hit.block.location.z + "§a..." };
 }
 
-export { removeNear, drainNear, replaceNear, floodFill };
+/**
+ * Removes a vertical column of blocks above the player (WorldEdit
+ * //removeabove): a square of the given apothem around the player, cleared to
+ * air for the given height upward.
+ * @param {Player} player The acting player.
+ * @param {number} size The apothem (0 = single column, 1 = 3x3, ...).
+ * @param {number} height The number of blocks up to clear.
+ * @returns {ActionResult} The result.
+ */
+function removeAbove(player, size, height) {
+    return removeColumn(player, size, height, 1, "RemoveAbove");
+}
+
+/**
+ * Removes a vertical column of blocks below the player (WorldEdit
+ * //removebelow).
+ * @param {Player} player The acting player.
+ * @param {number} size The apothem (0 = single column, 1 = 3x3, ...).
+ * @param {number} height The number of blocks down to clear.
+ * @returns {ActionResult} The result.
+ */
+function removeBelow(player, size, height) {
+    return removeColumn(player, size, height, -1, "RemoveBelow");
+}
+
+/**
+ * Clears a square column of blocks around the player, extending up or down.
+ * @param {Player} player The acting player.
+ * @param {number} size The apothem around the player.
+ * @param {number} height The number of blocks to clear along the direction.
+ * @param {number} dir 1 for up, -1 for down.
+ * @param {string} label The history label.
+ * @returns {ActionResult} The result.
+ */
+function removeColumn(player, size, height, dir, label) {
+    const busy = busyGuard(player);
+    if (busy) {
+        return busy;
+    }
+    const s = Math.max(0, Math.floor(size));
+    const h = Math.max(1, Math.floor(height));
+    const c = blockUnder(player);
+    const yA = c.y;
+    const yB = c.y + dir * (h - 1);
+    const min = { x: c.x - s, y: Math.min(yA, yB), z: c.z - s };
+    const max = { x: c.x + s, y: Math.max(yA, yB), z: c.z + s };
+    runBoxEdit(player, player.dimension, min, max, parsePattern(AIR_ID), null, true, label);
+    return { ok: true, message: "§a" + label + " started..." };
+}
+
+/**
+ * Reports the block-type distribution of the current selection (WorldEdit
+ * //distr).
+ * @param {Player} player The acting player.
+ * @returns {ActionResult} The result.
+ */
+function distribution(player) {
+    const region = requireRegion(player);
+    if (!region.ok) {
+        return region;
+    }
+    runDistribution(player, player.dimension, region.min, region.max);
+    return { ok: true, message: "§aScanning distribution..." };
+}
+
+export { removeNear, drainNear, replaceNear, floodFill, removeAbove, removeBelow, distribution };

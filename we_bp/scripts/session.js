@@ -1,4 +1,4 @@
-import { world, system, BlockPermutation, Vector3 } from "@minecraft/server";
+import { world, system, BlockPermutation } from "@minecraft/server";
 import { WE_CONFIG } from "./config.js";
 
 /**

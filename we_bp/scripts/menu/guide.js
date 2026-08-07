@@ -15,6 +15,7 @@ const SECTIONS = [
             { cmd: "/we:wand", desc: "Get the selection wand (wooden axe)." },
             { cmd: "/we:pos1  /we:pos2", desc: "Set a corner at your feet." },
             { cmd: "/we:pos <n>", desc: "Set polygon vertex n (fills confine to it)." },
+            { cmd: "/we:hpos1  /we:hpos2", desc: "Set a corner to the block you look at." },
             { cmd: "/we:sel", desc: "Show the current selection size." },
             { cmd: "/we:expand /we:contract /we:shift", desc: "Grow, shrink, or move the selection." },
             { cmd: "/we:outset /we:inset", desc: "Grow or shrink on every axis." },
@@ -32,6 +33,8 @@ const SECTIONS = [
             { cmd: "/we:overlay  /we:eoverlay", desc: "Blanket the surface with a block." },
             { cmd: "/we:move  /we:stack", desc: "Move or repeat the selection." },
             { cmd: "/we:count", desc: "Count a block type in the selection." },
+            { cmd: "/we:distr", desc: "Show the block distribution of the selection." },
+            { cmd: "/we:hollow [thickness]", desc: "Carve out the interior, leaving a shell." },
             { cmd: "/we:center", desc: "Place a block at the selection center." }
         ]
     },
@@ -44,6 +47,16 @@ const SECTIONS = [
             { cmd: "/we:pyramid /we:hpyramid", desc: "Pyramid; negative size = inverted." },
             { cmd: "/we:generate", desc: "Fill by a math expression (x,y,z span -1..1)." },
             { cmd: "/we:bridge  /we:ebridge", desc: "Path/curve between the two positions." }
+        ]
+    },
+    {
+        title: "Nature",
+        intro: "Surface decoration over the selection. These act on the top block of each column, so they suit large ground areas.",
+        entries: [
+            { cmd: "/we:naturalize", desc: "Layer the surface into grass, then dirt, then stone - makes a solid build look like real ground." },
+            { cmd: "/we:green", desc: "Turn exposed surface dirt into grass." },
+            { cmd: "/we:snow  /we:thaw", desc: "Lay snow and freeze water, or remove snow and melt ice." },
+            { cmd: "/we:flora [density]", desc: "Scatter flowers and grass on grassy surfaces (density 1-100)." }
         ]
     },
     {
@@ -114,6 +127,7 @@ const SECTIONS = [
             { cmd: "/we:mask list | status | off", desc: "List presets+saved masks, show the active mask, or clear it." },
             { cmd: "/we:emask <preset>", desc: "Limit edits to a preset: all_wool, all_foliage, all_logs, all_stone, all_ore, all_glass, and more." },
             { cmd: "/we:removenear /we:replacenear", desc: "Edit a block type within a radius (max 64)." },
+            { cmd: "/we:removeabove /we:removebelow [size] [height]", desc: "Clear a column of blocks above or below you." },
             { cmd: "/we:drain", desc: "Remove nearby liquids." },
             { cmd: "/we:up /we:thru /we:ascend /we:descend", desc: "Move up, through walls, or between platforms." },
             { cmd: "/we:jumpto /we:ceil /we:unstuck", desc: "Teleport to your crosshair, the ceiling, or out of blocks." }

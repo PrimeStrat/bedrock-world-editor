@@ -62,6 +62,9 @@ import { bookCommand } from "./book.js";
 import { pathCommand } from "./path.js";
 import { maskCommand, emaskCommand } from "./mask.js";
 import { toolCommand, toolItemNames } from "./tool.js";
+import { naturalizeCommand, greenCommand, snowCommand, thawCommand, floraCommand } from "./nature.js";
+import { removeAboveCommand, removeBelowCommand, distrCommand } from "./column.js";
+import { hpos1Command, hpos2Command } from "./hpos.js";
 import { posCommand } from "./pos.js";
 import { maskPresetNames } from "../actions/mask.js";
 
@@ -147,6 +150,16 @@ const COMMANDS = [
     maskCommand,
     emaskCommand,
     toolCommand,
+    naturalizeCommand,
+    greenCommand,
+    snowCommand,
+    thawCommand,
+    floraCommand,
+    removeAboveCommand,
+    removeBelowCommand,
+    distrCommand,
+    hpos1Command,
+    hpos2Command,
     posCommand
 ];
 

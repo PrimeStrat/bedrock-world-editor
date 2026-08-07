@@ -54,6 +54,28 @@ function setPositionHere(player, which) {
 }
 
 /**
+ * Sets a selection position to the block the player is looking at (WorldEdit
+ * //hpos1 and //hpos2).
+ * @param {Player} player The acting player.
+ * @param {number} which Either 1 or 2.
+ * @returns {ActionResult} The result.
+ */
+function setPositionLooked(player, which) {
+    const hit = player.getBlockFromViewDirection({ maxDistance: WE_CONFIG.brushRange, includePassableBlocks: false });
+    if (!hit) {
+        return { ok: false, message: "§cLook at a block to set the position." };
+    }
+    const loc = hit.block.location;
+    if (which === 1) {
+        setPos1(player.name, loc);
+    } else {
+        setPos2(player.name, loc);
+    }
+    showSelection(player);
+    return { ok: true, message: "§aPos" + which + " set to §f" + loc.x + " " + loc.y + " " + loc.z + "§a." + selectionSizeSuffix(player.name) };
+}
+
+/**
  * Gives the player the selection wand item.
  * @param {Player} player The acting player.
  * @returns {ActionResult} The result.
@@ -202,4 +224,4 @@ function outsetSelection(player, amount, inward) {
     return { ok: true, message: "§aSelection " + (inward ? "inset" : "outset") + "." };
 }
 
-export { setPositionHere, giveWand, deselect, selectionInfo, selectionSizeSuffix, expandSelection, contractSelection, shiftSelection, outsetSelection };
+export { setPositionHere, setPositionLooked, giveWand, deselect, selectionInfo, selectionSizeSuffix, expandSelection, contractSelection, shiftSelection, outsetSelection };
