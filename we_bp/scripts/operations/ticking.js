@@ -133,8 +133,10 @@ function* tickAreaFor(dimension, min, max, playerName) {
     // chunk in the box is actually loaded. The create promise resolving does not
     // guarantee the whole span is in memory, so testforblock pulls in any that
     // are still missing and we poll until the box is fully loaded.
+    let lastLoadTick = -1;
     while (system.currentTick < loadDeadline) {
-        if (loadState !== 0) {
+        if (loadState !== 0 && system.currentTick !== lastLoadTick) {
+            lastLoadTick = system.currentTick;
             forceLoadArea(dimension, min, max);
             if (areaFullyLoaded(dimension, min, max)) {
                 break;
